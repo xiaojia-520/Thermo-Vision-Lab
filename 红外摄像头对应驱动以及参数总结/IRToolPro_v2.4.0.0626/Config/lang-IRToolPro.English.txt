@@ -1,0 +1,149 @@
+//////////////////////////////////////////////////////////
+//IRToolPro
+
+IRToolPro=IRTool Pro
+
+//
+FrameFileView=Frame File View
+
+Tool_Select=Select
+Tool_Mouse=Mouse
+Tool_Shield=Shield
+Tool_Crop=Crop
+Tool_Point=Point
+Tool_Polyline=Polyline
+Tool_Polygon=Polygon
+
+PaletteType=Palette Type
+Image=Image
+FileParam=File Param
+MeaParam=Mea Param
+ExportText=Export Text
+SaveAndClose=Save & Close
+Close=Close
+
+//
+StreamFileView=Stream File View
+
+Playback=Playback
+SaveJpg=Save .jpg
+SaveMp4=Save .mp4
+SaveTxt=Save .txt
+SaveStream=Save .stream
+
+SaveStreamBegin=Save .stream Begin
+SaveStreamEnd=Save .stream End
+
+SaveMp4Begin=Save .mp4 Begin
+SaveMp4End=Save .mp4 End
+
+SaveTxtBegin=Save .txt Begin
+SaveTxtEnd=Save .txt End
+
+ConfigMeasure=Config Measure
+ConfigImage=Config Image
+ConfigMeasure2=Measure
+ConfigImage2=Image
+
+//
+Chart=Chart
+Chart_CacheCount=Cache Count
+Chart_AutoRange=Auto Range
+Chart_Min=Min
+Chart_Max=Max
+Chart_MinorDelta=Minor Delta
+Chart_MajorDelta=Major Delta
+Chart_UpdateInterval=Update Interval
+
+//
+Exit?=Exit?
+ConfigSystem=Config System
+DeviceParam=Device
+DisplayParam=Display
+SaveParam=Storage
+StreamFile_SampleInterval=save one per frames
+StreamFile_Mins=minutes per file
+
+//PTZ
+Pan=Pan
+Tilt=Tilt
+Zoom=Zoom
+0.01°=0.01°
+
+SetPan=SetP
+SetTilt=SetT
+SetZoom=SetZ
+
+LightPower=Light
+WiperPower=Wiper
+
+//
+ManualFFC=Manual FFC
+ZoomIn=Zoom In
+ZoomOut=Zoom Out
+
+Focus=Focus
+FocusAuto=Focus Auto
+FocusFar=Focus Far
+FocusNear=Focus Near
+
+Iris=Iris
+IrisOpen=Iris Open
+IrisClose=Iris Close
+
+IR_MfFocus=IR-Focus
+IR_MfFocusFar=IR-Focus Far
+IR_MfFocusNear=IR-Focus Near
+
+PresetId=Id
+PresetName=Name
+PresetGoto=Goto
+PresetSet=Set
+
+LightModeAuto=Auto
+LightModeOpen=Open
+LightModeClose=Close
+//
+Mask=Mask
+
+GearLevel=Gear Level
+
+Preview=Preview
+PTZ-VIS=PTZ-VIS
+PTZ-IR=PTZ-IR
+
+AutoReconnectBegin=Auto Reconnect Begin
+AutoReconnectEnd=Auto Reconnect End
+
+
+//
+TempStream=Temp
+VideoStream=Video
+Warden=IR+VIS
+FileView=File
+
+DiscoverDevice=Discover Device
+RemoteConfig=Config Device
+RemoteDebug=Mainten Device
+
+//
+RtspFormat=RTSP Format
+RtspFormatXXX=None:Custom, HK: HIK main stream
+RtspSuffix=RTSP Suffix
+RtspSuffixXXX=Splice RTSP address when RTSP Format=None
+
+RtspTrans=RTSP Trans
+RtspTransXXX=TCP:RTSPOverTCP, UDP:RTSPOverUDP
+
+CropX0=Crop-Left
+CropY0=Crop-Top
+CropX1=Crop-Right
+CropY1=Crop-Bottom
+
+DataManual=Manual Data
+DataAlarm=Alarm Data
+
+FpsNum=fps num
+FpsDen=fps den
+FrameBegin=frame begin
+FrameEnd=frame end

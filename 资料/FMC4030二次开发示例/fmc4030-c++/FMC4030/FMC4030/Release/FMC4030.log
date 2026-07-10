@@ -1,0 +1,8 @@
+﻿  FMC4030.cpp
+E:\fuyu\fmc4030_code\demo\fmc4030-c++\FMC4030\FMC4030\FMC4030.cpp(14,7): warning C4101: “fileName”: 未引用的局部变量
+  正在生成代码
+  1 of 15 functions ( 6.7%) were compiled, the rest were copied from previous compilation.
+    0 functions were new in current compilation
+    0 functions had inline decision re-evaluated but remain unchanged
+  已完成代码的生成
+  FMC4030.vcxproj -> E:\fuyu\fmc4030_code\demo\fmc4030-c++\FMC4030\Release\FMC4030.exe

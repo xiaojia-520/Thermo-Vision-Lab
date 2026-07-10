@@ -1,0 +1,105 @@
+2025-12-25 19:05:06.715 DEBUG Common\PRIYoseen.cpp,110,Yoseen_InitSDK:
+encoder: none, decoder: none
+
+2025-12-25 19:05:06.725 DEBUG Common\PRIYoseen.cpp,37,_initDiscover:
+Discover Broadcast2
+
+2025-12-25 19:05:10.366 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:05:15.329 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:07:16.494 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:08:02.391 DEBUG Common\PRIYoseen.cpp,110,Yoseen_InitSDK:
+encoder: none, decoder: none
+
+2025-12-25 19:08:02.398 DEBUG Common\PRIYoseen.cpp,40,_initDiscover:
+Discover Broadcast2, wsae 10048
+
+2025-12-25 19:09:44.787 DEBUG Common\PRIYoseen.cpp,110,Yoseen_InitSDK:
+encoder: none, decoder: none
+
+2025-12-25 19:09:44.793 DEBUG Common\PRIYoseen.cpp,37,_initDiscover:
+Discover Broadcast2
+
+2025-12-25 19:09:47.362 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:09:52.405 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:10:05.258 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:10:13.394 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:11:11.234 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:11:17.490 DEBUG Common\PRIYoseen.cpp,110,Yoseen_InitSDK:
+encoder: none, decoder: none
+
+2025-12-25 19:11:17.494 DEBUG Common\PRIYoseen.cpp,37,_initDiscover:
+Discover Broadcast2
+
+2025-12-25 19:11:20.110 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:11:25.738 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:12:18.970 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:17:08.607 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:17:13.980 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:18:03.175 DEBUG Common\PRIYoseen.cpp,110,Yoseen_InitSDK:
+encoder: none, decoder: none
+
+2025-12-25 19:18:03.182 DEBUG Common\PRIYoseen.cpp,37,_initDiscover:
+Discover Broadcast2
+
+2025-12-25 19:18:05.710 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:18:10.546 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:18:25.154 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:18:37.962 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.105, dataSize 8, ret 0
+
+2025-12-25 19:31:39.205 DEBUG Common\PRIYoseen.cpp,110,Yoseen_InitSDK:
+encoder: none, decoder: none
+
+2025-12-25 19:31:39.426 DEBUG Common\PRIYoseen.cpp,37,_initDiscover:
+Discover Broadcast2
+
+2025-12-25 19:31:43.917 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.110, dataSize 8, ret 0
+
+2025-12-25 19:33:10.565 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.110, dataSize 8, ret 0
+
+2025-12-25 19:34:50.276 DEBUG Common\PRIYoseen.cpp,110,Yoseen_InitSDK:
+encoder: none, decoder: none
+
+2025-12-25 19:34:50.283 DEBUG Common\PRIYoseen.cpp,37,_initDiscover:
+Discover Broadcast2
+
+2025-12-25 19:34:53.092 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.110, dataSize 8, ret 0
+
+2025-12-25 19:34:57.496 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
+broadcast, fromAddr 192.168.1.110, dataSize 8, ret 0
+

@@ -1,0 +1,1 @@
+G:\Project\AMC4030_V2\Example\C#\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\bin\Debug\FMC4030_Demo_CSharp.exe.config

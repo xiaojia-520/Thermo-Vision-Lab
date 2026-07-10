@@ -1,0 +1,406 @@
+////////////////////////////////////////////////////////////////////
+OK=OK
+Cancel=Cancel
+Apply=Apply
+
+Username=Username
+Password=Password
+
+Login=Login
+Logout=Logout
+
+Get=Get
+Set=Set
+
+Choose=Choose
+Modify=Modify
+Export=Export
+
+Discover=Discover
+Config=Config
+Mainten=Mainten
+System=System
+
+IP=IP
+
+DataDir=Data Dir
+ManualIpList=Manual Ip List
+ManualIpListXXX=IPv4 format, seperate by newline
+
+Success=Success
+Fail=Fail
+
+Waiting=Waiting
+About=About
+
+////////////////////////////////////////////////////////////////////
+Create=Create
+Retrive=Retrive
+Update=Update
+Delete=Delete
+DeleteAll=Delete All
+Add=Add
+Refresh=Refresh
+
+////////////////////////////////////////////////////////////////////
+GearDeviceAuto=Auto
+GearDevice1=Level-1
+GearDevice2=Level-2
+GearDevice3=Level-3
+
+GearSceneAuto=Auto
+GearScene1=Level-1
+GearScene2=Level-2
+GearScene150=150℃
+GearScene600=600℃
+GearScene300=300℃
+GearScene1600=1600℃
+
+////////////////////////////////////////////////////////////////////
+Index=Index
+Operation=Operation
+
+////////////////////////////////////////////////////////////////////
+ConfigSystem=Config System
+
+Basic=Basic
+
+////////////////////////////////////////////////////////////////////
+ConfigDevice=Config Device
+
+Network=Network
+Interface=Interface
+Advance=Advance
+Test=Test
+
+XCode=Code
+
+////////////////////////////////////////////////////////////////////
+MaintenDevice=Mainten Device
+
+FirmwareUpgrade=Firmware Upgrade
+ComBad=Compensate Bad
+UserCali=User Calibrate
+
+////////////////////////////////////////////////////////////////////
+CameraBasicInfo=Basic Info
+
+Fixed=Fixed Param
+Variable=Variable Param
+
+CameraId=Camera Id
+CameraType=Camera Type
+CameraName=Camera Name
+
+HardwareId=Hardware Id
+SoftwareId=Software Id
+
+FPAId=FPA Id
+
+Resolution=Resolution
+ResolutionAndFps=Resolution+Fps
+
+DataTransform=Transform
+DataTransformXXX=Device Support: Rotate-180°, X-Mirror, Y-Mirror. SDK support: Rotate-90°, Rotate-270°
+
+DataRatio=Data Ratio
+DataRatioXXX=TempStream=FPS/(DataRatio*SendRatio), VideoStream=FPS/DataRatio
+
+SendRatio=Send Ratio
+
+Filter_Median=Median Filter
+Filter_Desmear=Desmear Filter
+////////////////////////////////////////////////////////////////////
+CameraNetworkInfo=Network Info
+
+UseStaticIp=Use Static Ip
+StaticIp=Static Ip
+SubnetMask=SubnetMask
+Gateway=Gateway
+MacAddr=MAC
+Dns=Dns
+Dns2=Dns2
+
+////////////////////////////////////////////////////////////////////
+FFCInfo=FFC Info
+
+FramesSkippedAfterOpen=Frames Skipped After Open
+FramesSkippedAfterClose=Frames Skipped After Close
+FramesAccumulatedWhenClosed=Frames Accumulated When Closed
+
+TimeInterval=Time Interval(frames)
+TempInterval=Temp Interval(mK)
+
+AFRebound=autofocus rebound
+
+NstEnable=NST Enable
+NstEnableXXX=
+
+////////////////////////////////////////////////////////////////////
+FixInfo=Fix Info
+
+AtmFix=Atmospheric Fix
+DefaultFix=Default Fix
+
+EnableAtmFix=Enable Atm Fix
+
+AtmosphericTemperature=Atmospheric Temperature
+AtmosphericTemperatureXXX=Unit: ℃
+
+RelativeHumidity=Relative Humidity
+RelativeHumidityXXX=Unit: %
+
+Visibility=Visibility
+VisibilityXXX=Unit: km
+
+RainfallIntensity=Rainfall Intensity
+RainfallIntensityXXX=Unit: mm/h
+
+SnowfallIntensity=Snowfall Intensity
+SnowfallIntensityXXX=Unit: mm/h
+
+TargetDistance=Target Distance
+TargetDistanceXXX=Unit: m
+
+GlobalEmissivity=Global Emissivity
+InfraredWindowTrans=Infrared Window Trans
+InfraredWindowTempOffset=Infrared Window Temp Offset
+TempOffset=Temp Offset
+TempOffsetXXX=Unit: ℃
+
+////////////////////////////////////////////////////////////////////
+CameraTimeInfo=Time Info
+
+NtpServer=Ntp Server
+NtpServer2=Ntp Server2
+TimeZone=timezone
+
+////////////////////////////////////////////////////////////////////
+TvoutInfo=Tvout Info
+
+Tvout=Tvout
+Image=Image
+Image_Man=Manual Temp
+Image_CT=Color Temp 
+Image_ck=CK
+Image_hw=HW
+
+EnableTvout=Enable Tvout
+
+DigitalZoom=Zoom
+DigitalZoomXXX=1, 2, 4
+
+HDMI=HDMI Preset
+
+H264_Bitrate=Bitrate(bps)
+H264_GopSize=GOP Size
+
+PaletteType=Palette Type
+
+StrechType=Strech Type
+StrechTypeXXX=
+
+Gain=Gain
+GainXXX=[0.1, 10]
+
+DDELevel=DDE Level
+DDELevelXXX=[0, 8], 0-close
+
+XuiDisplayFlags=Enable Overlay
+
+ManEnable=Enable Manual
+ManTemp0=Temp1
+ManTemp0XXX=Unit: °C
+ManTemp1=Temp2
+ManTemp1XXX=Unit: °C
+
+CT_Type=Color Temp Type
+CT_TypeXXX=High: >Temp1, Use Color1\nLow: <Temp1, Use Color1\nMid: [Temp1, Temp2], Use Color1\nExMid: <Temp1, Use Color1; >Temp2, Use Color2.
+
+CT_Temp0=Temp1
+CT_Temp0XXX=Unit: °C
+CT_Temp1=Temp2
+CT_Temp1XXX=Unit: °C
+CT_Color0=Color1
+CT_Color1=Color2
+
+ck_lowPercent=Percent
+ck_lowPercentXXX=Unit: %, [1,20]
+ck_lowDelta=Temp Diff
+ck_lowDeltaXXX=Unit: °C, [5,100]
+
+hw_lowPercent=Percent
+hw_lowPercentXXX=Unit: %, [1,20]
+hw_lowDelta=Temp Diff
+hw_lowDeltaXXX=Unit: °C, [5,100]
+
+////////////////////////////////////////////////////////////////////
+GpioInfo=Gpio Info
+
+Input0=Input1
+Output0=Output1
+
+////////////////////////////////////////////////////////////////////
+SerialPortInfo=Serial Port Info
+
+Usage=Usage
+PelcoAddr=Addr
+BaudRate=BaudRate
+DataBits=DataBits
+StopBits=StopBits
+Parity=Parity
+
+////////////////////////////////////////////////////////////////////
+CameraOutputInfo=Output Info
+
+MIX=MIX
+IR=IR
+VIS=VIS
+H264=H264
+
+MixMode=Mix Mode
+
+MixRatio=Mix Ratio
+MixRatioXXX=[1,8]
+
+EnableHdmi=Enable Hdmi
+
+CropX=Crop-X
+CropXXXX=Multiple of 8
+
+CropY=Crop-Y
+CropYXXX=Multiple of 8
+
+CropWidth=Crop-Width
+CropWidthXXX=Multiple of 32
+
+CropHeight=Crop-Height
+CropHeightXXX=Multiple of 16
+
+FlipVIS=Flip-VIS
+
+XStartVIS=XStartVIS
+YStartVIS=YStartVIS
+
+FlipIR=Flip-IR
+
+////////////////////////////////////////////////////////////////////
+CameraPluginInfo=Camera Plugin Info
+
+ypdatavm_enable=YPDATAVM Enable
+onvif_enable=Onvif Enable
+gb28181_enable=GB28181 Enable
+modbus_enable=Modbus Enable
+
+onvif_version=Onvif Version
+gb28181_version=GB28181 Version
+modbus_version=Modbus Version
+
+Version=Version
+
+////////////////////////////////////////////////////////////////////
+Gpio_Test=Gpio Test
+Gpio_Light=Light
+Gpio_Ledy=yellow led
+Gpio_Ledb=blue led
+Gpio_Alarm=alarm
+Gpio_Buzz=buzz
+Gpio_SetGpio=Set Gpio
+
+Shutter_Test=Shutter Test
+Shutter_Open=Open
+Shutter_Close=Close
+
+////////////////////////////////////////////////////////////////////
+//RemoteDebugView
+ChooseFile=Choose File
+UploadFile=Upload File
+Download=Download
+DownloadLog=Download .log
+DownloadCust=Download .cust
+DownloadCust2=Download .cust2
+DownloadBad=Download .bad
+
+StoreFactory=Store Factory
+RestoreFactory=Restore Factory
+
+RestartDevice=Restart Device
+
+////////////////////////////////////////////////////////////////////
+//DebugBadView
+X=X
+Y=Y
+ComBad_Note=Move point by mouse wheel, left button, WSAD. Add or remove point by right button.
+LoadTemp=Load .jpg
+LoadBad=Load .bad
+SaveBad=Save .bad
+
+////////////////////////////////////////////////////////////////////
+//DebugCustView
+bbTemp=blackbody temp(℃)
+bbMeasure=measure temp(℃)
+bbEmissivity=emissivity
+AddPoint=Add Point
+DelPoint=Del Point
+LoadCust=Load .cust
+SaveCust=Save .cust
+
+
+////////////////////////////////////////////////////////////////////
+ExtBbConfig=ext-blackbody config
+ExtBbConfigEnable=enable calibrate
+ExtBbConfigTemp=blackbody temp
+ExtBbConfigX=center X
+ExtBbConfigY=center Y
+ExtBbConfigRadius=radius
+ExtBbConfigRadiusXXX=only support 3x3 area
+
+////////////////////////////////////////////////////////////////////
+Continue?=Continue?
+DiscoverPortInUse=Discover function may not work well, when port 55511 is occupied. Close every app based on YoseenSDK, then restart the app.
+
+
+////////////////////////////////////////////////////////////////////
+//TempCanvasDef, WardenCanvasDef
+MeasureId=ID
+MeasureType=Measure Type
+TextPos=Text Position
+XY=XY
+
+MeasureFlags=Measure Flags
+TrackMax=Track Max
+TrackMin=Track Min
+PlotMax=Plot Max
+PlotMin=Plot Min
+PlotAvg=Plot Avg
+
+Alarm=Alarm
+AlarmType=Alarm Type
+AlarmTypeXXX=none:\nmax: Max>Temp1\nmin: Min<Temp1\nmid: Min>Temp1 AND Max<Temp2\nexmid: Min<Temp1 OR Max>Temp2\nmaxmid: Max>Temp1 AND Max<Temp2
+AlarmTemp0=Temp1
+AlarmTemp1=Temp2
+
+//
+CapturedTime=Captured Time
+Save=Save
+PTZPreset=Preset
+PTZLight=Light
+Emissivity=Emi
+
+//
+ConfigDestrip=Destrip
+ConfigDestrip2=Destrip
+IRDestripConfig_type=Destrip Method
+IRDestripConfig_regular=Regular
+
+////////////////////////////////////////////////////////////////////
+//CameraOSDInfo
+CameraOSDInfo=OSD
+CameraOSDInfo_loc_enable=loc enable
+CameraOSDInfo_loc_x=loc x
+CameraOSDInfo_loc_y=loc y
+CameraOSDInfo_loc_name=loc name
+CameraOSDInfo_time_enable=time enable
+CameraOSDInfo_time_x=time x
+CameraOSDInfo_time_y=time y
+CameraOSDInfo_color=color

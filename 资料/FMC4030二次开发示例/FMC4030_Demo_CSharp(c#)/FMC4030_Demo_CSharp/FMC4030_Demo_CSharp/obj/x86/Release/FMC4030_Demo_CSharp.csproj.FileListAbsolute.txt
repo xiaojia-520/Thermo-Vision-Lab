@@ -1,0 +1,21 @@
+G:\Project\AMC4030_V2\Example\C#\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\bin\x86\Release\FMC4030_Demo_CSharp.exe.config
+G:\Project\AMC4030_V2\Example\C#\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\bin\x86\Release\FMC4030_Demo_CSharp.exe
+G:\Project\AMC4030_V2\Example\C#\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\bin\x86\Release\FMC4030_Demo_CSharp.pdb
+G:\Project\AMC4030_V2\Example\C#\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\obj\x86\Release\FMC4030_Demo_CSharp.csprojResolveAssemblyReference.cache
+G:\Project\AMC4030_V2\Example\C#\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\obj\x86\Release\FMC4030_Demo_CSharp.exe
+G:\Project\AMC4030_V2\Example\C#\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\obj\x86\Release\FMC4030_Demo_CSharp.pdb
+E:\资料\售后常用资料\控制器\FMC4030\FMC4030-2024-03-08\SDK Demo\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\obj\x86\Release\FMC4030_Demo_CSharp.exe
+E:\资料\售后常用资料\控制器\FMC4030\FMC4030-2024-03-08\SDK Demo\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\obj\x86\Release\FMC4030_Demo_CSharp.pdb
+E:\资料\售后常用资料\控制器\FMC4030\FMC4030-2024-03-08\SDK Demo\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\bin\x86\Release\FMC4030_Demo_CSharp.exe.config
+E:\资料\售后常用资料\控制器\FMC4030\FMC4030-2024-03-08\SDK Demo\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\bin\x86\Release\FMC4030_Demo_CSharp.exe
+E:\资料\售后常用资料\控制器\FMC4030\FMC4030-2024-03-08\SDK Demo\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\bin\x86\Release\FMC4030_Demo_CSharp.pdb
+E:\资料\售后常用资料\控制器\FMC4030\FMC4030-2024-03-08\SDK Demo\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\obj\x86\Release\FMC4030_Demo_CSharp.csproj.AssemblyReference.cache
+E:\资料\售后常用资料\控制器\FMC4030\FMC4030-2024-03-08\SDK Demo\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\obj\x86\Release\FMC4030_Demo_CSharp.csproj.CoreCompileInputs.cache
+E:\fuyu\文档\FMC4030文档汇总\国内\FMC4030二次开发示例\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\bin\x86\Release\FMC4030_Demo_CSharp.exe.config
+E:\fuyu\文档\FMC4030文档汇总\国内\FMC4030二次开发示例\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\bin\x86\Release\FMC4030_Demo_CSharp.exe
+E:\fuyu\文档\FMC4030文档汇总\国内\FMC4030二次开发示例\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\bin\x86\Release\FMC4030_Demo_CSharp.pdb
+E:\fuyu\文档\FMC4030文档汇总\国内\FMC4030二次开发示例\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\obj\x86\Release\FMC4030_Demo_CSharp.csproj.AssemblyReference.cache
+E:\fuyu\文档\FMC4030文档汇总\国内\FMC4030二次开发示例\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\obj\x86\Release\FMC4030_Demo_CSharp.exe.config
+E:\fuyu\文档\FMC4030文档汇总\国内\FMC4030二次开发示例\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\obj\x86\Release\FMC4030_Demo_CSharp.csproj.CoreCompileInputs.cache
+E:\fuyu\文档\FMC4030文档汇总\国内\FMC4030二次开发示例\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\obj\x86\Release\FMC4030_Demo_CSharp.exe
+E:\fuyu\文档\FMC4030文档汇总\国内\FMC4030二次开发示例\FMC4030_Demo_CSharp(c#)\FMC4030_Demo_CSharp\FMC4030_Demo_CSharp\obj\x86\Release\FMC4030_Demo_CSharp.pdb

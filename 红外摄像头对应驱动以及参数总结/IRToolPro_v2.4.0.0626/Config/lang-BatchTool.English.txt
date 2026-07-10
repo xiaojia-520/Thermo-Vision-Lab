@@ -1,0 +1,72 @@
+////////////////////////////////////////////////////////////////////
+//BatchTool
+CoreInfo=Core Info
+ExportInfo=Export Info
+NetworkInfo=Network Info
+
+//CoreInfo
+EnableAutoId=Enable AutoId
+AutoId=AutoId
+
+//IpInfo
+UseSameIp=Use Same Ip
+UseSameIpXXX=when selected, config the same ip for all devices; else, config auto inc ip for all devices.
+
+ChangeIP=Change IP
+
+//OnvifInfo
+CameraTime=Camera Time
+
+GetPluginInfo=Get Plugin Info
+SetPluginInfo=Set Plugin Info
+
+GetTime=Get Time
+SetTime=Set Time
+SetTimeNTP=Set Time NTP
+
+//GB28181Info
+Head_Version=Version
+Head_Enable=Enable
+
+ServerId=Server Id
+ServerIp=Server Ip
+ServerPort=Server Port
+
+DeviceId=Device Id
+DevicePort=SIP Port
+DevicePortRtp=RTP Port
+StreamId=Stream Id
+
+KeepAliveInterval=Keep Alive Interval(seconds)
+
+GetGB28181=Get GB28181
+SetGB28181=Set GB28181
+
+//
+UploadBin=Upload .bin
+UploadCali=Upload .cali
+UploadCali2=Upload .cali2
+UploadCali3=Upload .cali3
+
+UploadC2m=Upload .c2m
+UploadC2m2=Upload .c2m2
+UploadGaoWen=Upload .gaowen
+
+UploadCust=Upload .cust
+UploadCust2=Upload .cust2
+
+////////////////////////////////////////////////////////////////////
+
+InvalidFile=Invalid File
+InvalidBin=Invalid .bin
+InvalidBad=Invalid .bad
+InvalidCust=Invalid .cust
+InvalidCust2=Invalid .cust2
+
+InvalidCameraId=Invalid Camera Id
+
+SetCameraBasicInfo=Set Camera Basic Info
+SetNetworkInfo=Set Network Info
+StoreFactory=Store Factory
+RestoreFactory=Restore Factory
+Upload=Upload

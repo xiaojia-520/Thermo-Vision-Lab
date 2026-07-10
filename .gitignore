@@ -1,0 +1,34 @@
+# Visual Studio workspace cache
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# IntelliSense and compiler cache
+*.ipch
+ipch/
+Browse.VC.db
+Solution.VC.db
+*.VC.db
+*.VC.VC.opendb
+*.vsidx
+FileContentIndex/
+
+# .NET / C# build intermediates
+bin/
+obj/
+
+# C/C++ build intermediates
+*.obj
+*.iobj
+*.ipdb
+*.pdb
+*.tlog
+*.recipe
+
+# Runtime logs
+*.log
+
+# Large local installers
+红外摄像头对应驱动以及参数总结/.Net Framework离线安装包/ndp48-x86-x64-allos-enu.exe
