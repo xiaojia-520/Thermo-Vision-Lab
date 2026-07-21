@@ -1,3 +1,14 @@
 <Solution>
-  <Project Path="ThermoVision/ThermoVision.csproj" />
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="MotionHost/MotionHost.csproj" Id="e39ccfa1-9b88-40d3-a816-79690854d909">
+    <Platform Solution="Debug|x64" Project="x86" />
+    <Platform Solution="Debug|x86" Project="x86" />
+  </Project>
+  <Project Path="ThermoVision/ThermoVision.csproj" Id="fd774130-9abc-44c3-901f-b0aff388947b">
+    <Platform Solution="*|x64" Project="x64" />
+  </Project>
 </Solution>
