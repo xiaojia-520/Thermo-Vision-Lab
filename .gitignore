@@ -30,5 +30,8 @@ obj/
 # Runtime logs
 *.log
 
+# Recorded videos
+*.mp4
+
 # Large local installers
 红外摄像头对应驱动以及参数总结/.Net Framework离线安装包/ndp48-x86-x64-allos-enu.exe
