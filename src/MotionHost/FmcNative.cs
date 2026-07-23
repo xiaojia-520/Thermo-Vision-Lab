@@ -1,6 +1,6 @@
 ﻿using System.Runtime.InteropServices;
 
-namespace ThermoVision.MotionHost
+namespace MotionHost
 {
     internal static class FmcNative
     {
@@ -32,5 +32,25 @@ namespace ThermoVision.MotionHost
         internal static extern int FMC4030_Check_Axis_Is_Stop(
             int id,
             int axis);
+
+        [DllImport(
+            "FMC4030-Dll.dll",
+            CallingConvention = CallingConvention.StdCall)]
+        internal static extern int FMC4030_Jog_Single_Axis(
+            int id,
+            int axis,
+            float position,
+            float speed,
+            float acceleration,
+            float deceleration,
+            int mode);
+
+        [DllImport(
+            "FMC4030-Dll.dll",
+            CallingConvention = CallingConvention.StdCall)]
+        internal static extern int FMC4030_Stop_Single_Axis(
+            int id,
+            int axis,
+            int mode);
     }
 }

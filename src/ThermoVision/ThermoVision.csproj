@@ -75,6 +75,7 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="MotionHostClient.cs" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">
@@ -102,5 +103,28 @@
   <ItemGroup>
     <None Include="App.config" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\MotionHost\MotionHost.csproj">
+      <Project>{E39CCFA1-9B88-40D3-A816-79690854D909}</Project>
+      <Name>MotionHost</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <AdditionalProperties>Platform=x86</AdditionalProperties>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <PropertyGroup>
+    <MotionHostProject>$(MSBuildProjectDirectory)\..\MotionHost\MotionHost.csproj</MotionHostProject>
+    <MotionHostOutput>$(MSBuildProjectDirectory)\..\MotionHost\bin\x86\$(Configuration)</MotionHostOutput>
+  </PropertyGroup>
+  <Target Name="CopyMotionHostForThermoVision"
+          AfterTargets="Build">
+    <ItemGroup>
+      <MotionHostFiles Include="$(MotionHostOutput)\MotionHost.exe*" />
+      <MotionHostFiles Include="$(MotionHostOutput)\FMC4030-Dll.dll" />
+    </ItemGroup>
+    <MakeDir Directories="$(TargetDir)MotionHost" />
+    <Copy SourceFiles="@(MotionHostFiles)"
+          DestinationFolder="$(TargetDir)MotionHost"
+          SkipUnchangedFiles="true" />
+  </Target>
 </Project>

@@ -1,7 +1,9 @@
-﻿using System;
+using System;
+using System.Diagnostics;
+using System.Text;
 using System.Threading;
 
-namespace ThermoVision.MotionHost
+namespace MotionHost
 {
     internal class Program
     {
@@ -9,18 +11,30 @@ namespace ThermoVision.MotionHost
         private const string ControllerIp = "192.168.1.31";
         private const int ControllerPort = 8088;
 
-        // FMC4030 轴号：
-        // 0 = X
-        // 1 = Y
-        // 2 = Z
         private const int Axis = 0;
+        private const float ZeroSpeed = 4.0f;
+        private const float ZeroAcceleration = 1.0f;
+        private const float ZeroDeceleration = 1.0f;
+        private const float ReleaseDistance = 30.0f;
+        private const float MaximumSeekDistance = 50.0f;
+        private const int MoveTimeoutSeconds = 120;
 
-        private static void Main(string[] args)
+        private static int Main(string[] args)
         {
-            Console.WriteLine("FMC4030 连接与轴状态测试");
+            Console.OutputEncoding = Encoding.UTF8;
+
+            bool automatic =
+                HasArgument(args, "--software-zero");
+
+            Console.WriteLine("FMC4030 X 轴软件零点");
             Console.WriteLine("控制器 IP：" + ControllerIp);
             Console.WriteLine("端口：" + ControllerPort);
-            Console.WriteLine("轴号：" + Axis);
+            Console.WriteLine(
+                "寻零速度：" + ZeroSpeed +
+                " 个控制器单位/秒");
+            Console.WriteLine(
+                "正限位退出距离：" +
+                ReleaseDistance + " 个控制器单位");
             Console.WriteLine();
 
             int openResult =
@@ -35,84 +49,200 @@ namespace ThermoVision.MotionHost
             if (openResult != 0)
             {
                 Console.WriteLine("控制器连接失败。");
-                Console.WriteLine("请检查 IP、端口、网线、电源和 DLL 位数。");
-                Console.ReadKey();
-                return;
+                Console.WriteLine(
+                    "请检查 IP、端口、网线、电源和 DLL 位数。");
+                PauseWhenInteractive(automatic);
+                return 1;
             }
+
+            FmcSoftwareZero softwareZero =
+                new FmcSoftwareZero();
+
+            ConsoleCancelEventHandler cancelHandler =
+                delegate(
+                    object sender,
+                    ConsoleCancelEventArgs eventArgs)
+                {
+                    eventArgs.Cancel = true;
+                    softwareZero.RequestStop(
+                        DeviceId,
+                        Axis);
+                };
+
+            Console.CancelKeyPress += cancelHandler;
+
+            StartParentWatcher(
+                args,
+                softwareZero);
+
+            int exitCode = 0;
 
             try
             {
-                byte[] machineStatus = new byte[1024];
+                bool confirmed = automatic;
 
-                for (int i = 0; i < 10; i++)
+                if (!automatic)
                 {
-                    int statusResult =
-                        FmcNative.FMC4030_Get_Machine_Status(
-                            DeviceId,
-                            machineStatus);
-
                     Console.WriteLine(
-                        "Get_Machine_Status 返回值：" + statusResult);
+                        "警告：执行后 X 轴会真实运动。");
+                    Console.Write(
+                        "确认现场安全后输入 ZERO 并按回车：");
 
-                    if (statusResult != 0)
-                    {
-                        Console.WriteLine("读取机器状态失败。");
-                        break;
-                    }
-
-                    // realPos[0]、realPos[1]、realPos[2]
-                    // 位于缓冲区开头
-                    float position =
-                        BitConverter.ToSingle(
-                            machineStatus,
-                            Axis * 4);
-
-                    // realSpeed 数组紧跟在 realPos 后面
-                    float speed =
-                        BitConverter.ToSingle(
-                            machineStatus,
-                            12 + Axis * 4);
-
-                    // machine_status 中 axisStatus 的起始偏移
-                    uint axisStatus =
-                        BitConverter.ToUInt32(
-                            machineStatus,
-                            44 + Axis * 4);
-
-                    int stopResult =
-                        FmcNative.FMC4030_Check_Axis_Is_Stop(
-                            DeviceId,
-                            Axis);
-
-                    Console.WriteLine(
-                        "位置：" + position.ToString("F3"));
-
-                    Console.WriteLine(
-                        "速度：" + speed.ToString("F3"));
-
-                    Console.WriteLine(
-                        "轴状态：0x" + axisStatus.ToString("X8"));
-
-                    Console.WriteLine(
-                        "是否停止：" + stopResult);
-
-                    Console.WriteLine();
-
-                    Thread.Sleep(500);
+                    confirmed = string.Equals(
+                        Console.ReadLine(),
+                        "ZERO",
+                        StringComparison.Ordinal);
                 }
+
+                if (!confirmed)
+                {
+                    Console.WriteLine(
+                        "已取消，没有发送运动命令。");
+                    exitCode = 3;
+                }
+                else
+                {
+                    softwareZero.EstablishAtPositiveLimit(
+                        DeviceId,
+                        Axis,
+                        ZeroSpeed,
+                        ZeroAcceleration,
+                        ZeroDeceleration,
+                        ReleaseDistance,
+                        MaximumSeekDistance,
+                        TimeSpan.FromSeconds(
+                            MoveTimeoutSeconds));
+                }
+            }
+            catch (Exception exception)
+            {
+                Console.WriteLine(
+                    "建立软件零点失败：" +
+                    exception.Message);
+                exitCode = 2;
             }
             finally
             {
+                Console.CancelKeyPress -= cancelHandler;
+
                 int closeResult =
                     FmcNative.FMC4030_Close_Device(
                         DeviceId);
 
                 Console.WriteLine(
-                    "FMC4030_Close_Device 返回值：" + closeResult);
+                    "FMC4030_Close_Device 返回值：" +
+                    closeResult);
+
+                if (closeResult != 0 &&
+                    exitCode == 0)
+                {
+                    exitCode = 4;
+                }
+            }
+
+            if (exitCode == 0)
+            {
+                Console.WriteLine("软件零点流程执行完成。");
+            }
+
+            PauseWhenInteractive(automatic);
+            return exitCode;
+        }
+
+        private static bool HasArgument(
+            string[] args,
+            string expected)
+        {
+            foreach (string argument in args)
+            {
+                if (string.Equals(
+                    argument,
+                    expected,
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static int ReadParentProcessId(
+            string[] args)
+        {
+            for (int index = 0;
+                index < args.Length - 1;
+                index++)
+            {
+                if (!string.Equals(
+                    args[index],
+                    "--parent-pid",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                int parentProcessId;
+
+                if (int.TryParse(
+                    args[index + 1],
+                    out parentProcessId))
+                {
+                    return parentProcessId;
+                }
+            }
+
+            return 0;
+        }
+
+        private static void StartParentWatcher(
+            string[] args,
+            FmcSoftwareZero softwareZero)
+        {
+            int parentProcessId =
+                ReadParentProcessId(args);
+
+            if (parentProcessId <= 0)
+            {
+                return;
+            }
+
+            Thread watcher = new Thread(
+                delegate()
+                {
+                    try
+                    {
+                        Process parent =
+                            Process.GetProcessById(
+                                parentProcessId);
+
+                        parent.WaitForExit();
+
+                        softwareZero.RequestStop(
+                            DeviceId,
+                            Axis);
+                    }
+                    catch
+                    {
+                        // 辅助监控失败不覆盖运动流程中的原始错误。
+                    }
+                });
+
+            watcher.IsBackground = true;
+            watcher.Name = "ThermoVision parent watcher";
+            watcher.Start();
+        }
+
+        private static void PauseWhenInteractive(
+            bool automatic)
+        {
+            if (automatic)
+            {
+                return;
             }
 
             Console.WriteLine();
-            Console.WriteLine("测试结束，按任意键退出。");
+            Console.WriteLine("按任意键退出。");
             Console.ReadKey();
         }
     }

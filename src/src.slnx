@@ -10,5 +10,6 @@
   </Project>
   <Project Path="ThermoVision/ThermoVision.csproj" Id="fd774130-9abc-44c3-901f-b0aff388947b">
     <Platform Solution="*|x64" Project="x64" />
+    <Platform Solution="Debug|x86" Project="x64" />
   </Project>
 </Solution>
