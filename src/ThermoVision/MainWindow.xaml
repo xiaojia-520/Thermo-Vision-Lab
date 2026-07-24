@@ -1,38 +1,368 @@
 <Window x:Class="ThermoVision.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Thermo Vision"
-        Height="300"
-        Width="480"
-        WindowStartupLocation="CenterScreen">
-    <Grid Background="#F4F6F8">
-        <Border Width="320"
-                Padding="28"
+        xmlns:local="clr-namespace:ThermoVision"
+        Title="Thermo Vision Lab"
+        Height="680"
+        Width="1080"
+        MinHeight="620"
+        MinWidth="960"
+        Background="#F3F6FA"
+        WindowStartupLocation="CenterScreen"
+        Loaded="MainWindow_Loaded">
+    <Window.Resources>
+        <Style x:Key="ModuleButtonStyle"
+               TargetType="Button">
+            <Setter Property="Height" Value="42"/>
+            <Setter Property="Padding" Value="18,0"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#276EF1"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="Background"
+                                        Value="#1E5FD8"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="Background"
+                                        Value="#164EBA"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PendingModuleButtonStyle"
+               TargetType="Button"
+               BasedOn="{StaticResource ModuleButtonStyle}">
+            <Setter Property="Foreground" Value="#4F6078"/>
+            <Setter Property="Background" Value="#E7ECF3"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                Padding="{TemplateBinding Padding}"
+                                CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonBorder"
+                                        Property="Background"
+                                        Value="#DCE3ED"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="86"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="44"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0"
+                Background="#142033"
+                Padding="42,0">
+            <Grid>
+                <StackPanel Orientation="Horizontal"
+                            VerticalAlignment="Center">
+                    <Border Width="42"
+                            Height="42"
+                            Background="#276EF1"
+                            CornerRadius="9">
+                        <TextBlock Text="TV"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"
+                                   Foreground="White"
+                                   FontSize="15"
+                                   FontWeight="Bold"/>
+                    </Border>
+                    <StackPanel Margin="14,0,0,0"
+                                VerticalAlignment="Center">
+                        <TextBlock Text="Thermo Vision Lab"
+                                   Foreground="White"
+                                   FontSize="20"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Text="宽温域三维红外成像测试平台"
+                                   Margin="0,4,0,0"
+                                   Foreground="#AEBBD0"
+                                   FontSize="12"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <TextBlock HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           Text="系统控制台"
+                           Foreground="#AEBBD0"
+                           FontSize="13"/>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1">
+            <ScrollViewer x:Name="DashboardView"
+                          VerticalScrollBarVisibility="Auto">
+            <Grid Margin="42,34,42,30">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="28"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="26"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0">
+                    <TextBlock Text="设备控制总览"
+                               Foreground="#17233A"
+                               FontSize="30"
+                               FontWeight="SemiBold"/>
+                    <TextBlock Text="从这里进入各子系统。实验舱、轴体控制与红外工具已经接入。"
+                               Margin="0,10,0,0"
+                               Foreground="#66758B"
+                               FontSize="14"/>
+                </StackPanel>
+
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="18"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="18"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0"
+                            Padding="26"
+                            Background="White"
+                            BorderBrush="#F1D2AC"
+                            BorderThickness="1"
+                            CornerRadius="12">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Border Width="48"
+                                        Height="48"
+                                        HorizontalAlignment="Left"
+                                        Background="#FFF2E5"
+                                        CornerRadius="10">
+                                    <TextBlock Text="BOX"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="#D97706"
+                                               FontSize="11"
+                                               FontWeight="Bold"/>
+                                </Border>
+                                <Border HorizontalAlignment="Right"
+                                        VerticalAlignment="Top"
+                                        Padding="9,4"
+                                        Background="#EAF7EF"
+                                        CornerRadius="10">
+                                    <TextBlock Text="已接入"
+                                               Foreground="#26834A"
+                                               FontSize="11"/>
+                                </Border>
+                            </Grid>
+                            <StackPanel Grid.Row="1"
+                                        Margin="0,24,0,24">
+                                <TextBlock Text="实验舱监控"
+                                           Foreground="#17233A"
+                                           FontSize="23"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Margin="0,12,0,0"
+                                           Text="只读监视温湿度、设定值、运行阶段、部件状态与报警。"
+                                           Foreground="#66758B"
+                                           FontSize="13"
+                                           TextWrapping="Wrap"
+                                           LineHeight="21"/>
+                            </StackPanel>
+                            <Button Grid.Row="2"
+                                    Content="进入实验舱监控"
+                                    Style="{StaticResource ModuleButtonStyle}"
+                                    Click="CabinetButton_Click"/>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Column="2"
+                            Padding="26"
+                            Background="White"
+                            BorderBrush="#BFD2F8"
+                            BorderThickness="1"
+                            CornerRadius="12">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Border Width="48"
+                                        Height="48"
+                                        HorizontalAlignment="Left"
+                                        Background="#EAF1FF"
+                                        CornerRadius="10">
+                                    <TextBlock Text="XYZ"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="#276EF1"
+                                               FontSize="12"
+                                               FontWeight="Bold"/>
+                                </Border>
+                                <Border HorizontalAlignment="Right"
+                                        VerticalAlignment="Top"
+                                        Padding="9,4"
+                                        Background="#EAF7EF"
+                                        CornerRadius="10">
+                                    <TextBlock Text="已接入"
+                                               Foreground="#26834A"
+                                               FontSize="11"/>
+                                </Border>
+                            </Grid>
+                            <StackPanel Grid.Row="1"
+                                        Margin="0,24,0,24">
+                                <TextBlock Text="轴体控制"
+                                           Foreground="#17233A"
+                                           FontSize="23"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Margin="0,12,0,0"
+                                           Text="控制三组 FMC4030 运动平台，执行 X、Y、Z 轴安全回零。"
+                                           Foreground="#66758B"
+                                           FontSize="13"
+                                           TextWrapping="Wrap"
+                                           LineHeight="21"/>
+                            </StackPanel>
+                            <Button Grid.Row="2"
+                                    Content="进入轴体控制"
+                                    Style="{StaticResource ModuleButtonStyle}"
+                                    Click="AxisControlButton_Click"/>
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Column="4"
+                            Padding="26"
+                            Background="White"
+                            BorderBrush="#DDE4ED"
+                            BorderThickness="1"
+                            CornerRadius="12">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid>
+                                <Border Width="48"
+                                        Height="48"
+                                        HorizontalAlignment="Left"
+                                        Background="#F1EBFF"
+                                        CornerRadius="10">
+                                    <TextBlock Text="IR"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="#7048C8"
+                                               FontSize="14"
+                                               FontWeight="Bold"/>
+                                </Border>
+                                <Border HorizontalAlignment="Right"
+                                        VerticalAlignment="Top"
+                                        Padding="9,4"
+                                        Background="#EAF7EF"
+                                        CornerRadius="10">
+                                    <TextBlock Text="已接入"
+                                               Foreground="#26834A"
+                                               FontSize="11"/>
+                                </Border>
+                            </Grid>
+                            <StackPanel Grid.Row="1"
+                                        Margin="0,24,0,24">
+                                <TextBlock Text="红外相机"
+                                           Foreground="#17233A"
+                                           FontSize="23"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Margin="0,12,0,0"
+                                           Text="预览热像、控制采集并关联保存温度数据与空间坐标。"
+                                           Foreground="#66758B"
+                                           FontSize="13"
+                                           TextWrapping="Wrap"
+                                           LineHeight="21"/>
+                            </StackPanel>
+                            <Button Grid.Row="2"
+                                    Content="打开红外工具"
+                                    Style="{StaticResource ModuleButtonStyle}"
+                                    Click="InfraredButton_Click"/>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <Border Grid.Row="4"
+                        Padding="22,17"
+                        Background="#EAF1FF"
+                        BorderBrush="#CFDCF5"
+                        BorderThickness="1"
+                        CornerRadius="9">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="当前配置"
+                                   Foreground="#244A87"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="1"
+                                   Margin="24,0,0,0"
+                                   Text="实验舱：192.168.1.30:8000　　运动控制器：192.168.1.31 / .32 / .33:8088"
+                                   Foreground="#4F6485"
+                                   FontSize="13"/>
+                    </Grid>
+                </Border>
+            </Grid>
+            </ScrollViewer>
+
+            <local:AxisControl x:Name="AxisControlView"
+                               Visibility="Collapsed"
+                               BackRequested="AxisControlView_BackRequested"/>
+
+            <local:ChamberControl x:Name="ChamberControlView"
+                                  Visibility="Collapsed"
+                                  BackRequested="ChamberControlView_BackRequested"/>
+        </Grid>
+
+        <Border Grid.Row="2"
                 Background="White"
-                BorderBrush="#D9DEE5"
-                BorderThickness="1"
-                CornerRadius="8"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center">
-            <StackPanel>
-                <TextBlock Text="运动控制"
-                           FontSize="24"
-                           FontWeight="SemiBold"
-                           HorizontalAlignment="Center"/>
-
-                <Button x:Name="SoftwareZeroButton"
-                        Content="X 轴回零"
-                        Height="46"
-                        Margin="0,24,0,14"
-                        FontSize="16"
-                        Click="SoftwareZeroButton_Click"/>
-
-                <TextBlock x:Name="MotionStatusText"
-                           Text="等待操作"
-                           Foreground="#59636E"
-                           TextAlignment="Center"
-                           TextWrapping="Wrap"/>
-            </StackPanel>
+                BorderBrush="#DDE4ED"
+                BorderThickness="0,1,0,0"
+                Padding="42,0">
+            <TextBlock VerticalAlignment="Center"
+                       Text="Thermo Vision Lab · 设备集成控制平台"
+                       Foreground="#8A97A9"
+                       FontSize="11"/>
         </Border>
     </Grid>
 </Window>

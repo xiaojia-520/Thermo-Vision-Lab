@@ -67,12 +67,36 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
+    <Page Include="AxisControl.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="AxisStatusControl.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="ChamberControl.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
     <Compile Include="App.xaml.cs">
       <DependentUpon>App.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="MainWindow.xaml.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="AxisControl.xaml.cs">
+      <DependentUpon>AxisControl.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="AxisStatusControl.xaml.cs">
+      <DependentUpon>AxisStatusControl.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="ChamberControl.xaml.cs">
+      <DependentUpon>ChamberControl.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
     <Compile Include="MotionHostClient.cs" />
@@ -104,6 +128,10 @@
     <None Include="App.config" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\BoxHost\BoxHost.csproj">
+      <Project>{B9A5BDF3-DF2E-46ED-8509-284F8EC60B51}</Project>
+      <Name>BoxHost</Name>
+    </ProjectReference>
     <ProjectReference Include="..\MotionHost\MotionHost.csproj">
       <Project>{E39CCFA1-9B88-40D3-A816-79690854D909}</Project>
       <Name>MotionHost</Name>

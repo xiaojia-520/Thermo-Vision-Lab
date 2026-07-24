@@ -35,6 +35,7 @@ obj/
 
 # IRToolPro acquisition recordings (large local capture data)
 红外摄像头对应驱动以及参数总结/IRToolPro_v2.4.0.0626/DataManual/*.stream
+src/IRToolPro_v2.4.0.0626/DataManual/*.stream
 
 # Large local installers
 红外摄像头对应驱动以及参数总结/.Net Framework离线安装包/ndp48-x86-x64-allos-enu.exe

@@ -45,8 +45,6 @@ namespace MotionHost
             float maximumSeekDistance,
             TimeSpan moveTimeout)
         {
-            cancellationRequested = false;
-
             ValidateParameters(
                 axis,
                 speed,
@@ -65,7 +63,8 @@ namespace MotionHost
                 if (initial.PositiveLimitActive)
                 {
                     Console.WriteLine(
-                        "X 轴当前压在正限位，先向负方向退出 " +
+                        GetAxisName(axis) +
+                        " 轴当前压在正限位，先向负方向退出 " +
                         releaseDistance.ToString("F3") + " 个控制器单位。");
 
                     MoveRelativeAndWait(
@@ -151,7 +150,8 @@ namespace MotionHost
                         finalSnapshot.RawPosition);
 
                 Console.WriteLine(
-                    "软件零点建立完成。当前软件 X = " +
+                    "软件零点建立完成。当前软件 " +
+                    GetAxisName(axis) + " = " +
                     softwarePosition.ToString("F3"));
 
                 return rawZeroPosition;
@@ -423,7 +423,8 @@ namespace MotionHost
             if (stopState != 1)
             {
                 throw new InvalidOperationException(
-                    "X 轴当前没有停止，不能建立软件零点。返回值：" +
+                    GetAxisName(axis) +
+                    " 轴当前没有停止，不能建立软件零点。返回值：" +
                     stopState);
             }
         }
@@ -460,7 +461,9 @@ namespace MotionHost
             }
 
             throw new TimeoutException(
-                "发送停止命令后，X 轴没有及时停止。");
+                "发送停止命令后，" +
+                GetAxisName(axis) +
+                " 轴没有及时停止。");
         }
 
         private void ThrowIfCancellationRequested()
@@ -468,7 +471,7 @@ namespace MotionHost
             if (cancellationRequested)
             {
                 throw new OperationCanceledException(
-                    "用户按下 Ctrl+C，运动已停止。");
+                    "回零已取消，运动已停止。");
             }
         }
 
@@ -499,6 +502,22 @@ namespace MotionHost
                 snapshot.Speed.ToString("F3") +
                 "，状态：0x" +
                 snapshot.AxisStatus.ToString("X8"));
+        }
+
+        private static string GetAxisName(
+            int axis)
+        {
+            switch (axis)
+            {
+                case 0:
+                    return "X";
+                case 1:
+                    return "Y";
+                case 2:
+                    return "Z";
+                default:
+                    return axis.ToString();
+            }
         }
 
         private static void ValidateParameters(

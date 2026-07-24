@@ -4,6 +4,7 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
+  <Project Path="BoxHost/BoxHost.csproj" Id="b9a5bdf3-df2e-46ed-8509-284f8ec60b51" />
   <Project Path="MotionHost/MotionHost.csproj" Id="e39ccfa1-9b88-40d3-a816-79690854d909">
     <Platform Solution="Debug|x64" Project="x86" />
     <Platform Solution="Debug|x86" Project="x86" />

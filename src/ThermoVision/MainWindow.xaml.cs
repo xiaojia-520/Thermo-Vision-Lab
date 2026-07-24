@@ -1,83 +1,237 @@
 using System;
+using System.Diagnostics;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 
 namespace ThermoVision
 {
     public partial class MainWindow : Window
     {
-        private readonly MotionHostClient motionHostClient;
+        private const int RestoreWindow = 9;
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetForegroundWindow(
+            IntPtr windowHandle);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool ShowWindowAsync(
+            IntPtr windowHandle,
+            int command);
 
         public MainWindow()
         {
             InitializeComponent();
-            motionHostClient = new MotionHostClient();
         }
 
-        private async void SoftwareZeroButton_Click(
+        private async void MainWindow_Loaded(
             object sender,
             RoutedEventArgs eventArgs)
         {
-            MessageBoxResult confirmation =
-                MessageBox.Show(
-                    "X 轴将真实运动并寻找正限位。" +
-                    Environment.NewLine +
-                    "请确认现场无人、急停可用且运动方向安全。",
-                    "确认 X 轴回零",
-                    MessageBoxButton.OKCancel,
-                    MessageBoxImage.Warning);
-
-            if (confirmation != MessageBoxResult.OK)
+            try
             {
-                MotionStatusText.Text = "已取消";
-                return;
+                await ChamberControlView
+                    .StartMonitoringAsync();
             }
+            catch
+            {
+                // ChamberControl 页面会持续显示连接状态。
+            }
+        }
 
-            SoftwareZeroButton.IsEnabled = false;
-            MotionStatusText.Text =
-                "正在建立软件零点，请勿关闭程序……";
+        private async void AxisControlButton_Click(
+            object sender,
+            RoutedEventArgs eventArgs)
+        {
+            DashboardView.Visibility =
+                Visibility.Collapsed;
+            AxisControlView.Visibility =
+                Visibility.Visible;
 
             try
             {
-                MotionHostResult result =
-                    await motionHostClient.RunSoftwareZeroAsync();
+                await AxisControlView
+                    .StartMonitoringAsync();
+            }
+            catch
+            {
+                // AxisControl 页面已显示具体启动错误。
+            }
+        }
 
-                if (result.Success)
+        private void AxisControlView_BackRequested(
+            object sender,
+            System.EventArgs eventArgs)
+        {
+            AxisControlView.Visibility =
+                Visibility.Collapsed;
+            DashboardView.Visibility =
+                Visibility.Visible;
+        }
+
+        private async void CabinetButton_Click(
+            object sender,
+            RoutedEventArgs eventArgs)
+        {
+            DashboardView.Visibility =
+                Visibility.Collapsed;
+            ChamberControlView.Visibility =
+                Visibility.Visible;
+
+            try
+            {
+                await ChamberControlView
+                    .StartMonitoringAsync();
+            }
+            catch
+            {
+                // ChamberControl 页面会持续显示连接状态。
+            }
+        }
+
+        private void ChamberControlView_BackRequested(
+            object sender,
+            System.EventArgs eventArgs)
+        {
+            ChamberControlView.Visibility =
+                Visibility.Collapsed;
+            DashboardView.Visibility =
+                Visibility.Visible;
+        }
+
+        private void InfraredButton_Click(
+            object sender,
+            RoutedEventArgs eventArgs)
+        {
+            Process[] runningProcesses =
+                Process.GetProcessesByName(
+                    "IRToolPro");
+            bool runningProcessFound = false;
+
+            try
+            {
+                foreach (Process process
+                    in runningProcesses)
                 {
-                    MotionStatusText.Text =
-                        "X 轴软件零点建立完成";
+                    if (process.HasExited)
+                    {
+                        continue;
+                    }
+
+                    runningProcessFound = true;
+                    process.Refresh();
+
+                    if (process.MainWindowHandle !=
+                        IntPtr.Zero)
+                    {
+                        ShowWindowAsync(
+                            process.MainWindowHandle,
+                            RestoreWindow);
+                        SetForegroundWindow(
+                            process.MainWindowHandle);
+                        return;
+                    }
+                }
+
+                if (runningProcessFound)
+                {
                     MessageBox.Show(
-                        "X 轴软件零点建立完成。",
-                        "回零完成",
+                        "IRToolPro 已经运行，但暂时没有可激活的主窗口。" +
+                        Environment.NewLine +
+                        "请在任务栏中切换到 IRToolPro。",
+                        "红外相机",
                         MessageBoxButton.OK,
                         MessageBoxImage.Information);
+                    return;
                 }
-                else
-                {
-                    MotionStatusText.Text =
-                        "回零失败，错误码：" +
-                        result.ExitCode;
-
-                    MessageBox.Show(
-                        result.Output,
-                        "回零失败",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Error);
-                }
-            }
-            catch (Exception exception)
-            {
-                MotionStatusText.Text = "无法启动运动控制";
-
-                MessageBox.Show(
-                    exception.Message,
-                    "运动控制错误",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Error);
             }
             finally
             {
-                SoftwareZeroButton.IsEnabled = true;
+                foreach (Process process
+                    in runningProcesses)
+                {
+                    process.Dispose();
+                }
             }
+
+            string executablePath =
+                FindInfraredToolExecutable();
+
+            if (executablePath == null)
+            {
+                MessageBox.Show(
+                    "找不到 IRToolPro.exe。" +
+                    Environment.NewLine +
+                    "请确认 IRToolPro_v2.4.0.0626 文件夹位于 src 根目录。",
+                    "红外相机启动失败",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+                return;
+            }
+
+            try
+            {
+                Process.Start(
+                    new ProcessStartInfo
+                    {
+                        FileName = executablePath,
+                        WorkingDirectory =
+                            Path.GetDirectoryName(
+                                executablePath),
+                        UseShellExecute = true
+                    });
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show(
+                    "IRToolPro 启动失败：" +
+                    exception.Message,
+                    "红外相机启动失败",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+        }
+
+        private static string
+            FindInfraredToolExecutable()
+        {
+            const string infraredToolDirectory =
+                "IRToolPro_v2.4.0.0626";
+            const string executableName =
+                "IRToolPro.exe";
+
+            DirectoryInfo directory =
+                new DirectoryInfo(
+                    AppDomain.CurrentDomain
+                        .BaseDirectory);
+
+            while (directory != null)
+            {
+                string candidate =
+                    Path.Combine(
+                        directory.FullName,
+                        infraredToolDirectory,
+                        executableName);
+
+                if (File.Exists(candidate))
+                {
+                    return candidate;
+                }
+
+                directory = directory.Parent;
+            }
+
+            return null;
+        }
+
+        protected override void OnClosed(
+            EventArgs eventArgs)
+        {
+            AxisControlView.Shutdown();
+            ChamberControlView.Shutdown();
+            base.OnClosed(eventArgs);
         }
     }
 }

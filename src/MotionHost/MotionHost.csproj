@@ -53,6 +53,8 @@
   <ItemGroup>
     <Compile Include="FmcNative.cs" />
     <Compile Include="FmcSoftwareZero.cs" />
+    <Compile Include="MotionServer.cs" />
+    <Compile Include="MotionSettingsStore.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

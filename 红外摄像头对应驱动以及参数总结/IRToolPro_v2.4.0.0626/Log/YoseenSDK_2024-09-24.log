@@ -1,6 +1,0 @@
-2024-09-24 15:52:37.456 DEBUG Common\PRIYoseen.cpp,110,Yoseen_InitSDK:
-encoder: none, decoder: none
-
-2024-09-24 15:52:37.459 DEBUG Common\PRIYoseen.cpp,40,_initDiscover:
-Discover Broadcast2, wsae 10048
-

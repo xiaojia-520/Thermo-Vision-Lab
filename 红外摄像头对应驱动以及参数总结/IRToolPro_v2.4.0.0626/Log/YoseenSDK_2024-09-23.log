@@ -1,9 +1,0 @@
-2024-09-23 11:28:53.598 DEBUG Common\PRIYoseen.cpp,110,Yoseen_InitSDK:
-encoder: none, decoder: none
-
-2024-09-23 11:28:53.602 DEBUG Common\PRIYoseen.cpp,37,_initDiscover:
-Discover Broadcast2
-
-2024-09-23 11:28:56.912 DEBUG Discover\YoseenDiscover.cpp,89,broadcastSendAll:
-broadcast, fromAddr 192.168.1.10, dataSize 8, ret 0
-

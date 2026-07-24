@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.Text;
 using System.Threading;
@@ -8,26 +8,99 @@ namespace MotionHost
     internal class Program
     {
         private const int DeviceId = 0;
-        private const string ControllerIp = "192.168.1.31";
         private const int ControllerPort = 8088;
 
-        private const int Axis = 0;
         private const float ZeroSpeed = 4.0f;
         private const float ZeroAcceleration = 1.0f;
         private const float ZeroDeceleration = 1.0f;
         private const float ReleaseDistance = 30.0f;
-        private const float MaximumSeekDistance = 50.0f;
+        private const float MaximumSeekDistance = 150.0f;
         private const int MoveTimeoutSeconds = 120;
+        private const string MotionHostMutexName =
+            "ThermoVision.MotionHost.FMC4030.Singleton";
 
         private static int Main(string[] args)
         {
             Console.OutputEncoding = Encoding.UTF8;
 
+            using (Mutex instanceMutex =
+                new Mutex(
+                    false,
+                    MotionHostMutexName))
+            {
+                bool ownsMutex;
+
+                try
+                {
+                    ownsMutex =
+                        instanceMutex.WaitOne(0);
+                }
+                catch (AbandonedMutexException)
+                {
+                    ownsMutex = true;
+                }
+
+                if (!ownsMutex)
+                {
+                    Console.WriteLine(
+                        "已有 MotionHost 正在控制 FMC4030，" +
+                        "为避免重复连接，本次启动已拒绝。");
+                    return 7;
+                }
+
+                try
+                {
+                    return Run(args);
+                }
+                finally
+                {
+                    instanceMutex.ReleaseMutex();
+                }
+            }
+        }
+
+        private static int Run(string[] args)
+        {
+            if (HasArgument(args, "--server"))
+            {
+                return MotionServer.Run(args);
+            }
+
             bool automatic =
                 HasArgument(args, "--software-zero");
 
-            Console.WriteLine("FMC4030 X 轴软件零点");
-            Console.WriteLine("控制器 IP：" + ControllerIp);
+            int controllerNumber;
+
+            try
+            {
+                controllerNumber =
+                    ReadControllerNumber(args);
+            }
+            catch (ArgumentException exception)
+            {
+                Console.WriteLine(exception.Message);
+                PauseWhenInteractive(automatic);
+                return 5;
+            }
+
+            string controllerIp =
+                "192.168.1." +
+                (30 + controllerNumber).ToString();
+
+            int[] axes =
+                controllerNumber == 3
+                    ? new int[] { 0, 1, 2 }
+                    : new int[] { 0, 1 };
+
+            string axisSummary =
+                controllerNumber == 3
+                    ? "X、Y、Z"
+                    : "X、Y";
+
+            Console.WriteLine(
+                "FMC4030 " + controllerNumber +
+                " 号轴回零（" + axisSummary + "）");
+            Console.WriteLine("控制器 IP：" + controllerIp);
             Console.WriteLine("端口：" + ControllerPort);
             Console.WriteLine(
                 "寻零速度：" + ZeroSpeed +
@@ -40,7 +113,7 @@ namespace MotionHost
             int openResult =
                 FmcNative.FMC4030_Open_Device(
                     DeviceId,
-                    ControllerIp,
+                    controllerIp,
                     ControllerPort);
 
             Console.WriteLine(
@@ -55,8 +128,8 @@ namespace MotionHost
                 return 1;
             }
 
-            FmcSoftwareZero softwareZero =
-                new FmcSoftwareZero();
+            HomingSession homingSession =
+                new HomingSession();
 
             ConsoleCancelEventHandler cancelHandler =
                 delegate(
@@ -64,16 +137,14 @@ namespace MotionHost
                     ConsoleCancelEventArgs eventArgs)
                 {
                     eventArgs.Cancel = true;
-                    softwareZero.RequestStop(
-                        DeviceId,
-                        Axis);
+                    homingSession.RequestStop();
                 };
 
             Console.CancelKeyPress += cancelHandler;
 
             StartParentWatcher(
                 args,
-                softwareZero);
+                homingSession);
 
             int exitCode = 0;
 
@@ -84,7 +155,9 @@ namespace MotionHost
                 if (!automatic)
                 {
                     Console.WriteLine(
-                        "警告：执行后 X 轴会真实运动。");
+                        "警告：执行后 " + controllerNumber +
+                        " 号轴的 " + axisSummary +
+                        " 方向会依次真实运动。");
                     Console.Write(
                         "确认现场安全后输入 ZERO 并按回车：");
 
@@ -102,17 +175,52 @@ namespace MotionHost
                 }
                 else
                 {
-                    softwareZero.EstablishAtPositiveLimit(
-                        DeviceId,
-                        Axis,
-                        ZeroSpeed,
-                        ZeroAcceleration,
-                        ZeroDeceleration,
-                        ReleaseDistance,
-                        MaximumSeekDistance,
-                        TimeSpan.FromSeconds(
-                            MoveTimeoutSeconds));
+                    foreach (int axis in axes)
+                    {
+                        FmcSoftwareZero softwareZero =
+                            new FmcSoftwareZero();
+
+                        if (!homingSession.TryActivate(
+                            softwareZero,
+                            axis))
+                        {
+                            throw new OperationCanceledException(
+                                "回零已取消。");
+                        }
+
+                        try
+                        {
+                            Console.WriteLine();
+                            Console.WriteLine(
+                                "开始回 " +
+                                GetAxisName(axis) +
+                                " 轴。");
+
+                            softwareZero.EstablishAtPositiveLimit(
+                                DeviceId,
+                                axis,
+                                ZeroSpeed,
+                                ZeroAcceleration,
+                                ZeroDeceleration,
+                                ReleaseDistance,
+                                MaximumSeekDistance,
+                                TimeSpan.FromSeconds(
+                                    MoveTimeoutSeconds));
+                        }
+                        finally
+                        {
+                            homingSession.ClearActive(
+                                softwareZero);
+                        }
+                    }
                 }
+            }
+            catch (OperationCanceledException exception)
+            {
+                Console.WriteLine(
+                    "回零流程已停止：" +
+                    exception.Message);
+                exitCode = 3;
             }
             catch (Exception exception)
             {
@@ -195,9 +303,43 @@ namespace MotionHost
             return 0;
         }
 
+        private static int ReadControllerNumber(
+            string[] args)
+        {
+            for (int index = 0;
+                index < args.Length;
+                index++)
+            {
+                if (!string.Equals(
+                    args[index],
+                    "--controller",
+                    StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                int controllerNumber;
+
+                if (index == args.Length - 1 ||
+                    !int.TryParse(
+                        args[index + 1],
+                        out controllerNumber) ||
+                    controllerNumber < 1 ||
+                    controllerNumber > 3)
+                {
+                    throw new ArgumentException(
+                        "--controller 必须指定 1、2 或 3。");
+                }
+
+                return controllerNumber;
+            }
+
+            return 1;
+        }
+
         private static void StartParentWatcher(
             string[] args,
-            FmcSoftwareZero softwareZero)
+            HomingSession homingSession)
         {
             int parentProcessId =
                 ReadParentProcessId(args);
@@ -218,9 +360,7 @@ namespace MotionHost
 
                         parent.WaitForExit();
 
-                        softwareZero.RequestStop(
-                            DeviceId,
-                            Axis);
+                        homingSession.RequestStop();
                     }
                     catch
                     {
@@ -231,6 +371,22 @@ namespace MotionHost
             watcher.IsBackground = true;
             watcher.Name = "ThermoVision parent watcher";
             watcher.Start();
+        }
+
+        private static string GetAxisName(
+            int axis)
+        {
+            switch (axis)
+            {
+                case 0:
+                    return "X";
+                case 1:
+                    return "Y";
+                case 2:
+                    return "Z";
+                default:
+                    return axis.ToString();
+            }
         }
 
         private static void PauseWhenInteractive(
@@ -244,6 +400,71 @@ namespace MotionHost
             Console.WriteLine();
             Console.WriteLine("按任意键退出。");
             Console.ReadKey();
+        }
+
+        private sealed class HomingSession
+        {
+            private readonly object syncRoot =
+                new object();
+
+            private bool cancellationRequested;
+            private FmcSoftwareZero activeSoftwareZero;
+            private int activeAxis = -1;
+
+            internal bool TryActivate(
+                FmcSoftwareZero softwareZero,
+                int axis)
+            {
+                lock (syncRoot)
+                {
+                    if (cancellationRequested)
+                    {
+                        return false;
+                    }
+
+                    activeSoftwareZero = softwareZero;
+                    activeAxis = axis;
+                    return true;
+                }
+            }
+
+            internal void ClearActive(
+                FmcSoftwareZero softwareZero)
+            {
+                lock (syncRoot)
+                {
+                    if (!ReferenceEquals(
+                        activeSoftwareZero,
+                        softwareZero))
+                    {
+                        return;
+                    }
+
+                    activeSoftwareZero = null;
+                    activeAxis = -1;
+                }
+            }
+
+            internal void RequestStop()
+            {
+                FmcSoftwareZero softwareZero;
+                int axis;
+
+                lock (syncRoot)
+                {
+                    cancellationRequested = true;
+                    softwareZero = activeSoftwareZero;
+                    axis = activeAxis;
+                }
+
+                if (softwareZero != null &&
+                    axis >= 0)
+                {
+                    softwareZero.RequestStop(
+                        DeviceId,
+                        axis);
+                }
+            }
         }
     }
 }
