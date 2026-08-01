@@ -202,6 +202,7 @@ namespace MotionHost
                                 ZeroSpeed,
                                 ZeroAcceleration,
                                 ZeroDeceleration,
+                                null,
                                 ReleaseDistance,
                                 MaximumSeekDistance,
                                 TimeSpan.FromSeconds(

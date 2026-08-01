@@ -119,7 +119,8 @@
                 <StackPanel HorizontalAlignment="Right"
                             VerticalAlignment="Center"
                             Orientation="Horizontal">
-                    <Button Height="32"
+                    <Button x:Name="StopAllButton"
+                            Height="32"
                             Margin="0,0,12,0"
                             Padding="13,0"
                             Foreground="White"
@@ -346,13 +347,23 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <Button x:Name="SelectedControllerHomeButton"
-                                Grid.Column="1"
-                                Width="128"
-                                Content="当前轴回零"
-                                IsEnabled="False"
-                                Style="{StaticResource PrimaryButtonStyle}"
-                                Click="ControllerZeroButton_Click"/>
+                        <StackPanel Grid.Column="1"
+                                    Orientation="Horizontal">
+                            <Button x:Name="SelectedControllerHomeButton"
+                                    Width="128"
+                                    Margin="0,0,8,0"
+                                    Content="当前轴回零"
+                                    IsEnabled="False"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Click="ControllerZeroButton_Click"/>
+                            <Button x:Name="SelectedControllerRangeButton"
+                                    Width="152"
+                                    Content="标定负限位/行程"
+                                    IsEnabled="False"
+                                    ToolTip="回零后依次低速寻找各轴负限位并保存最大行程"
+                                    Style="{StaticResource PrimaryButtonStyle}"
+                                    Click="ControllerRangeButton_Click"/>
+                        </StackPanel>
                     </Grid>
 
                     <Border Grid.Row="1"

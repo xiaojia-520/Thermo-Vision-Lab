@@ -2,6 +2,7 @@ using System;
 using System.Globalization;
 using System.IO;
 using System.IO.Pipes;
+using System.Net.NetworkInformation;
 using System.Text;
 using System.Threading;
 
@@ -10,6 +11,9 @@ namespace MotionHost
     internal sealed class MotionServer
     {
         private const int StatusIntervalMilliseconds = 200;
+        private const int StopAllWaitTimeoutMilliseconds = 3500;
+        private const int ShutdownStopWaitTimeoutMilliseconds =
+            500;
 
         private readonly string pipeName;
         private readonly int parentProcessId;
@@ -84,8 +88,6 @@ namespace MotionHost
 
         private int RunInternal()
         {
-            StartParentWatcher();
-
             try
             {
                 pipe =
@@ -95,6 +97,8 @@ namespace MotionHost
                         1,
                         PipeTransmissionMode.Byte,
                         PipeOptions.Asynchronous);
+
+                StartParentWatcher();
 
                 pipe.WaitForConnection();
 
@@ -159,16 +163,33 @@ namespace MotionHost
             {
                 RequestShutdown();
 
-                foreach (ControllerSession controller
-                    in controllers)
+                Thread[] shutdownStopThreads =
+                    new Thread[controllers.Length];
+
+                for (int index = 0;
+                    index < controllers.Length;
+                    index++)
                 {
-                    controller.RequestStop();
+                    shutdownStopThreads[index] =
+                        controllers[index]
+                            .RequestStopForShutdown();
                 }
 
                 if (statusThread != null &&
                     statusThread.IsAlive)
                 {
                     statusThread.Join(1500);
+                }
+
+                foreach (Thread stopThread
+                    in shutdownStopThreads)
+                {
+                    if (stopThread != null &&
+                        stopThread.IsAlive)
+                    {
+                        stopThread.Join(
+                            ShutdownStopWaitTimeoutMilliseconds);
+                    }
                 }
 
                 foreach (ControllerSession controller
@@ -314,6 +335,58 @@ namespace MotionHost
                 return;
             }
 
+            if (command == "CALIBRATE_RANGE" &&
+                parts.Length == 3)
+            {
+                int requestId;
+                int controllerNumber;
+
+                if (!int.TryParse(
+                        parts[1],
+                        out requestId) ||
+                    !int.TryParse(
+                        parts[2],
+                        out controllerNumber))
+                {
+                    return;
+                }
+
+                ControllerSession controller =
+                    FindController(
+                        controllerNumber);
+
+                if (controller == null)
+                {
+                    SendResult(
+                        requestId,
+                        false,
+                        5,
+                        "控制器编号必须是 1、2 或 3。");
+                    return;
+                }
+
+                string error;
+
+                bool started =
+                    controller
+                        .TryStartRangeCalibration(
+                            requestId,
+                            SendProgress,
+                            SendResult,
+                            out error);
+
+                if (!started)
+                {
+                    SendResult(
+                        requestId,
+                        false,
+                        2,
+                        error);
+                }
+
+                return;
+            }
+
             if (command == "STOP" &&
                 parts.Length == 3)
             {
@@ -344,19 +417,51 @@ namespace MotionHost
                     return;
                 }
 
-                string stopError;
-                bool stopped =
-                    controller
-                        .RequestStopAndVerify(
-                            out stopError);
+                controller.RequestStop();
 
-                SendResult(
-                    requestId,
-                    stopped,
-                    stopped ? 0 : 2,
-                    stopped
-                        ? "已发送停止命令并确认全部轴停止。"
-                        : stopError);
+                ThreadPool.QueueUserWorkItem(
+                    delegate
+                    {
+                        string stopError;
+                        bool stopped =
+                            controller
+                                .VerifyStopAndWait(
+                                    out stopError);
+
+                        SendResult(
+                            requestId,
+                            stopped,
+                            stopped ? 0 : 2,
+                            stopped
+                                ? "已发送停止命令并确认全部轴停止。"
+                                : stopError);
+                    });
+                return;
+            }
+
+            if (command == "STOP_ALL" &&
+                parts.Length == 3)
+            {
+                int requestId;
+
+                if (!int.TryParse(
+                    parts[1],
+                    out requestId))
+                {
+                    return;
+                }
+
+                foreach (ControllerSession controller
+                    in controllers)
+                {
+                    controller.RequestStop();
+                }
+
+                ThreadPool.QueueUserWorkItem(
+                    delegate
+                    {
+                        StopAllControllers(requestId);
+                    });
                 return;
             }
 
@@ -523,6 +628,119 @@ namespace MotionHost
             }
 
             return null;
+        }
+
+        private void StopAllControllers(
+            int requestId)
+        {
+            bool[] stopped =
+                new bool[controllers.Length];
+            string[] errors =
+                new string[controllers.Length];
+            ManualResetEvent completed =
+                new ManualResetEvent(false);
+            int remaining = controllers.Length;
+
+            foreach (ControllerSession controller
+                in controllers)
+            {
+                try
+                {
+                    controller.RequestStop();
+                }
+                catch (Exception exception)
+                {
+                    errors[
+                        controller.ControllerNumber - 1] =
+                            exception.Message;
+                }
+            }
+
+            for (int index = 0;
+                index < controllers.Length;
+                index++)
+            {
+                int controllerIndex = index;
+
+                ThreadPool.QueueUserWorkItem(
+                    delegate
+                    {
+                        try
+                        {
+                            if (errors[controllerIndex] == null)
+                            {
+                                string error;
+                                stopped[controllerIndex] =
+                                    controllers[controllerIndex]
+                                        .VerifyStopAndWait(
+                                            out error);
+                                errors[controllerIndex] =
+                                    error;
+                            }
+                        }
+                        catch (Exception exception)
+                        {
+                            errors[controllerIndex] =
+                                exception.Message;
+                        }
+                        finally
+                        {
+                            if (Interlocked.Decrement(
+                                ref remaining) == 0)
+                            {
+                                completed.Set();
+                            }
+                        }
+                    });
+            }
+
+            bool allCompleted =
+                completed.WaitOne(
+                    StopAllWaitTimeoutMilliseconds);
+            StringBuilder message =
+                new StringBuilder();
+            bool allStopped =
+                allCompleted;
+
+            for (int index = 0;
+                index < controllers.Length;
+                index++)
+            {
+                bool controllerStopped =
+                    stopped[index] &&
+                    string.IsNullOrWhiteSpace(
+                        errors[index]);
+                allStopped =
+                    allStopped &&
+                    controllerStopped;
+
+                message.Append(
+                    controllers[index].ControllerNumber);
+                message.Append(
+                    controllerStopped
+                        ? " 号控制器已确认停止。"
+                        : " 号控制器未确认停止：");
+
+                if (!controllerStopped)
+                {
+                    message.Append(
+                        string.IsNullOrWhiteSpace(
+                            errors[index])
+                            ? "停止确认超时。"
+                            : errors[index]);
+                }
+
+                if (index < controllers.Length - 1)
+                {
+                    message.AppendLine();
+                }
+            }
+
+            SendResult(
+                requestId,
+                allStopped,
+                allStopped ? 0 : 2,
+                message.ToString());
         }
 
         private void SendStatus(
@@ -763,17 +981,31 @@ namespace MotionHost
     internal sealed class ControllerSession
     {
         private const int ControllerPort = 8088;
-        private const int ImmediateStop = 2;
+        private const int ReachabilityTimeoutMilliseconds =
+            250;
+        private const int DeceleratedStop = 1;
         private const int RelativeMove = 1;
         private const int PollIntervalMilliseconds = 50;
-        private const float ZeroSpeed = 4.0f;
+        private const float MoveSpeed = 4.0f;
+        private const float KnownZeroSpeed = 10.0f;
+        private const float UnknownZeroSpeed = 1.0f;
+        private const float SlowMoveSpeed = 1.0f;
+        private const float SlowdownDistance = 10.0f;
+        private const float SlowdownSegmentDistance = 2.0f;
         private const float ZeroAcceleration = 1.0f;
         private const float ZeroDeceleration = 1.0f;
         private const float ReleaseDistance = 30.0f;
         private const float MaximumSeekDistance = 150.0f;
+        private const float MaximumRangeCalibrationDistance =
+            3000.0f;
+        private const float RangeCalibrationStartTolerance =
+            1.0f;
         private const int MoveTimeoutSeconds = 120;
+        private const int RangeCalibrationTimeoutMinutes = 60;
         private const int StopVerificationTimeoutMilliseconds =
             3000;
+        private const int CloseDeviceTimeoutMilliseconds =
+            1500;
 
         private readonly object stateLock =
             new object();
@@ -835,6 +1067,11 @@ namespace MotionHost
                     DateTime.UtcNow.AddSeconds(2);
             }
 
+            if (!IsControllerReachable())
+            {
+                return false;
+            }
+
             int result =
                 FmcNative.FMC4030_Open_Device(
                     deviceId,
@@ -846,6 +1083,28 @@ namespace MotionHost
                 connected = result == 0;
                 consecutiveReadFailures = 0;
                 return connected;
+            }
+        }
+
+        private bool IsControllerReachable()
+        {
+            try
+            {
+                using (Ping ping = new Ping())
+                {
+                    PingReply reply =
+                        ping.Send(
+                            ipAddress,
+                            ReachabilityTimeoutMilliseconds);
+
+                    return reply != null &&
+                        reply.Status ==
+                            IPStatus.Success;
+                }
+            }
+            catch
+            {
+                return false;
             }
         }
 
@@ -1134,6 +1393,61 @@ namespace MotionHost
             return true;
         }
 
+        internal bool TryStartRangeCalibration(
+            int requestId,
+            Action<int, string> progress,
+            Action<int, bool, int, string> result,
+            out string error)
+        {
+            foreach (int axis in axes)
+            {
+                float rawZeroPosition;
+
+                if (!TryGetUsableZero(
+                        axis,
+                        out rawZeroPosition))
+                {
+                    error =
+                        GetAxisName(axis) +
+                        " 轴尚未完成回零，不能标定负限位。";
+                    return false;
+                }
+            }
+
+            lock (stateLock)
+            {
+                if (!connected)
+                {
+                    error =
+                        "控制器未连接，不能标定负限位。";
+                    return false;
+                }
+
+                if (commandRunning)
+                {
+                    error =
+                        "该控制器正在执行运动命令。";
+                    return false;
+                }
+
+                commandRunning = true;
+                stopRequested = false;
+                commandFinished.Reset();
+            }
+
+            ThreadPool.QueueUserWorkItem(
+                delegate
+                {
+                    RunRangeCalibration(
+                        requestId,
+                        progress,
+                        result);
+                });
+
+            error = null;
+            return true;
+        }
+
         internal void SetSoftwareLimits(
             int axis,
             float minimum,
@@ -1164,40 +1478,47 @@ namespace MotionHost
 
         internal void RequestStop()
         {
+            SignalStopRequest();
+            SendDeceleratedStopCommands();
+        }
+
+        internal Thread RequestStopForShutdown()
+        {
+            SignalStopRequest();
+
+            if (!IsConnected())
+            {
+                return null;
+            }
+
+            Thread stopThread =
+                new Thread(
+                    delegate()
+                    {
+                        SendDeceleratedStopCommands();
+                    });
+
+            stopThread.IsBackground = true;
+            stopThread.Name =
+                "FMC4030 shutdown stop " +
+                deviceId;
+            stopThread.Start();
+            return stopThread;
+        }
+
+        private void SignalStopRequest()
+        {
             FmcSoftwareZero softwareZero;
-            int currentAxis;
 
             lock (stateLock)
             {
                 stopRequested = true;
                 softwareZero = activeSoftwareZero;
-                currentAxis = activeAxis;
             }
 
-            if (softwareZero != null &&
-                currentAxis >= 0)
+            if (softwareZero != null)
             {
-                softwareZero.RequestStop(
-                    deviceId,
-                    currentAxis);
-            }
-
-            if (IsConnected())
-            {
-                foreach (int axis in axes)
-                {
-                    try
-                    {
-                        FmcNative.FMC4030_Stop_Single_Axis(
-                            deviceId,
-                            axis,
-                            ImmediateStop);
-                    }
-                    catch
-                    {
-                        // 尽力停止全部轴。
-                    }
-                }
+                softwareZero.RequestCancellation();
             }
         }
 
@@ -1206,21 +1527,39 @@ namespace MotionHost
         {
             RequestStop();
 
-            if (!IsConnected())
-            {
-                error =
-                    "停止命令已尝试发送，但控制器未连接，" +
-                    "无法确认轴体已经停止。请检查现场急停。";
-                return false;
-            }
+            return VerifyStopAndWait(
+                out error);
+        }
 
+        internal bool VerifyStopAndWait(
+            out string error)
+        {
             DateTime deadline =
                 DateTime.UtcNow.AddMilliseconds(
                     StopVerificationTimeoutMilliseconds);
             string lastError = null;
+            DateTime nextStopRetryUtc =
+                DateTime.MinValue;
 
             while (DateTime.UtcNow < deadline)
             {
+                if (DateTime.UtcNow >=
+                    nextStopRetryUtc)
+                {
+                    string stopError =
+                        SendDeceleratedStopCommands();
+
+                    if (!string.IsNullOrWhiteSpace(
+                        stopError))
+                    {
+                        lastError = stopError;
+                    }
+
+                    nextStopRetryUtc =
+                        DateTime.UtcNow
+                            .AddMilliseconds(200);
+                }
+
                 bool allStopped = true;
 
                 foreach (int axis in axes)
@@ -1275,9 +1614,68 @@ namespace MotionHost
             return false;
         }
 
+        private string SendDeceleratedStopCommands()
+        {
+            if (!IsConnected())
+            {
+                return null;
+            }
+
+            StringBuilder errors =
+                new StringBuilder();
+
+            foreach (int axis in axes)
+            {
+                try
+                {
+                    int stopResult =
+                        FmcNative
+                            .FMC4030_Stop_Single_Axis(
+                                deviceId,
+                                axis,
+                                DeceleratedStop);
+
+                    if (stopResult != 0)
+                    {
+                        if (errors.Length > 0)
+                        {
+                            errors.Append(" ");
+                        }
+
+                        errors.Append(
+                            GetAxisName(axis));
+                        errors.Append(
+                            " 轴立即停止返回 ");
+                        errors.Append(
+                            stopResult);
+                        errors.Append("。");
+                    }
+                }
+                catch (Exception exception)
+                {
+                    if (errors.Length > 0)
+                    {
+                        errors.Append(" ");
+                    }
+
+                    errors.Append(
+                        GetAxisName(axis));
+                    errors.Append(
+                        " 轴立即停止异常：");
+                    errors.Append(
+                        exception.Message);
+                    errors.Append("。");
+                }
+            }
+
+            return errors.Length == 0
+                ? null
+                : errors.ToString();
+        }
+
         internal void Shutdown()
         {
-            RequestStop();
+            SignalStopRequest();
 
             if (!commandFinished.WaitOne(
                 StopVerificationTimeoutMilliseconds))
@@ -1297,15 +1695,28 @@ namespace MotionHost
 
             if (shouldClose)
             {
-                try
-                {
-                    FmcNative.FMC4030_Close_Device(
-                        deviceId);
-                }
-                catch
-                {
-                    // 退出时不覆盖原始错误。
-                }
+                Thread closeThread =
+                    new Thread(
+                        delegate()
+                        {
+                            try
+                            {
+                                FmcNative.FMC4030_Close_Device(
+                                    deviceId);
+                            }
+                            catch
+                            {
+                                // 退出时不覆盖原始错误。
+                            }
+                        });
+
+                closeThread.IsBackground = true;
+                closeThread.Name =
+                    "FMC4030 close device " +
+                    deviceId;
+                closeThread.Start();
+                closeThread.Join(
+                    CloseDeviceTimeoutMilliseconds);
             }
 
             commandFinished.Dispose();
@@ -1319,6 +1730,11 @@ namespace MotionHost
             try
             {
                 ThrowIfStopRequested();
+
+                bool[] zeroKnownBeforeHome =
+                    new bool[3];
+                float[] knownRawZeroPositions =
+                    new float[3];
 
                 foreach (int configuredAxis in axes)
                 {
@@ -1340,6 +1756,16 @@ namespace MotionHost
 
                 foreach (int configuredAxis in axes)
                 {
+                    float existingRawZeroPosition;
+
+                    zeroKnownBeforeHome[configuredAxis] =
+                        settingsStore.TryGetZero(
+                            ControllerNumber,
+                            configuredAxis,
+                            out existingRawZeroPosition);
+                    knownRawZeroPositions[configuredAxis] =
+                        existingRawZeroPosition;
+
                     SetZeroReferenceValid(
                         configuredAxis,
                         false);
@@ -1378,14 +1804,23 @@ namespace MotionHost
                         GetAxisName(axis) +
                         " 轴正在回零");
 
+                    float homingSpeed =
+                        zeroKnownBeforeHome[axis]
+                            ? KnownZeroSpeed
+                            : UnknownZeroSpeed;
+
                     float rawZeroPosition =
                         softwareZero
                             .EstablishAtPositiveLimit(
                                 deviceId,
                                 axis,
-                                ZeroSpeed,
+                                homingSpeed,
                                 ZeroAcceleration,
                                 ZeroDeceleration,
+                                zeroKnownBeforeHome[axis]
+                                    ? (float?)
+                                        knownRawZeroPositions[axis]
+                                    : null,
                                 ReleaseDistance,
                                 MaximumSeekDistance,
                                 TimeSpan.FromSeconds(
@@ -1464,6 +1899,378 @@ namespace MotionHost
                 }
 
                 commandFinished.Set();
+            }
+        }
+
+        private void RunRangeCalibration(
+            int requestId,
+            Action<int, string> progress,
+            Action<int, bool, int, string> result)
+        {
+            try
+            {
+                ThrowIfStopRequested();
+
+                float[] rawZeroPositions =
+                    new float[3];
+
+                foreach (int axis in axes)
+                {
+                    int stopState =
+                        FmcNative
+                            .FMC4030_Check_Axis_Is_Stop(
+                                deviceId,
+                                axis);
+
+                    if (stopState != 1)
+                    {
+                        throw new InvalidOperationException(
+                            GetAxisName(axis) +
+                            " 轴当前没有停止，不能开始标定负限位。" +
+                            "返回值：" +
+                            stopState);
+                    }
+
+                    if (!TryGetUsableZero(
+                            axis,
+                            out rawZeroPositions[axis]))
+                    {
+                        throw new InvalidOperationException(
+                            GetAxisName(axis) +
+                            " 轴软件零点已失效，请重新回零。");
+                    }
+
+                    AxisMotionState state =
+                        ReadAxisMotionState(axis);
+                    float softwarePosition =
+                        rawZeroPositions[axis] -
+                        state.RawPosition;
+
+                    if (Math.Abs(
+                            softwarePosition -
+                            ReleaseDistance) >
+                        RangeCalibrationStartTolerance)
+                    {
+                        throw new InvalidOperationException(
+                            GetAxisName(axis) +
+                            " 轴当前软件位置为 " +
+                            softwarePosition.ToString("F3") +
+                            "，必须重新回零并停在正限位退出 " +
+                            ReleaseDistance.ToString("F0") +
+                            " 的位置后才能标定负限位。");
+                    }
+
+                    const uint negativeLimit = 0x0010;
+                    const uint positiveLimit = 0x0020;
+
+                    if ((state.Status & negativeLimit) != 0 ||
+                        (state.Status & positiveLimit) != 0)
+                    {
+                        throw new InvalidOperationException(
+                            GetAxisName(axis) +
+                            " 轴当前仍触发物理限位，不能开始标定。");
+                    }
+                }
+
+                StringBuilder summary =
+                    new StringBuilder();
+
+                foreach (int axis in axes)
+                {
+                    ThrowIfStopRequested();
+
+                    lock (stateLock)
+                    {
+                        activeAxis = axis;
+                    }
+
+                    progress(
+                        ControllerNumber,
+                        GetAxisName(axis) +
+                        " 轴正以速度 " +
+                        SlowMoveSpeed.ToString("F1") +
+                        " 寻找负限位");
+
+                    float maximumTravel =
+                        CalibrateAxisRange(
+                            axis,
+                            rawZeroPositions[axis]);
+                    float rawNegativeLimitPosition =
+                        rawZeroPositions[axis] -
+                        maximumTravel;
+
+                    settingsStore.SetLimits(
+                        ControllerNumber,
+                        axis,
+                        0,
+                        maximumTravel);
+
+                    progress(
+                        ControllerNumber,
+                        GetAxisName(axis) +
+                        " 轴负限位标定完成，原始位置 " +
+                        rawNegativeLimitPosition
+                            .ToString("F3") +
+                        "，最大行程 " +
+                        maximumTravel.ToString("F3"));
+
+                    if (summary.Length > 0)
+                    {
+                        summary.AppendLine();
+                    }
+
+                    summary.Append(
+                        GetAxisName(axis));
+                    summary.Append(
+                        " 轴负限位原始位置：");
+                    summary.Append(
+                        rawNegativeLimitPosition
+                            .ToString("F3"));
+                    summary.Append(
+                        "，最大行程：");
+                    summary.Append(
+                        maximumTravel.ToString("F3"));
+                }
+
+                result(
+                    requestId,
+                    true,
+                    0,
+                    ControllerNumber +
+                    " 号控制器负限位与最大行程标定完成。" +
+                    Environment.NewLine +
+                    summary);
+            }
+            catch (OperationCanceledException exception)
+            {
+                string message =
+                    AppendStopVerificationWarning(
+                        exception.Message);
+
+                result(
+                    requestId,
+                    false,
+                    3,
+                    message);
+            }
+            catch (Exception exception)
+            {
+                string message =
+                    AppendStopVerificationWarning(
+                        exception.Message);
+
+                result(
+                    requestId,
+                    false,
+                    2,
+                    message);
+            }
+            finally
+            {
+                lock (stateLock)
+                {
+                    activeAxis = -1;
+                    commandRunning = false;
+                }
+
+                commandFinished.Set();
+            }
+        }
+
+        private float CalibrateAxisRange(
+            int axis,
+            float rawZeroPosition)
+        {
+            const uint negativeLimit = 0x0010;
+            const uint positiveLimit = 0x0020;
+
+            DateTime deadline =
+                DateTime.UtcNow.AddMinutes(
+                    RangeCalibrationTimeoutMinutes);
+
+            int moveResult =
+                FmcNative
+                    .FMC4030_Jog_Single_Axis(
+                        deviceId,
+                        axis,
+                        -MaximumRangeCalibrationDistance,
+                        SlowMoveSpeed,
+                        ZeroAcceleration,
+                        ZeroDeceleration,
+                        RelativeMove);
+
+            if (moveResult != 0)
+            {
+                throw new InvalidOperationException(
+                    GetAxisName(axis) +
+                    " 轴启动负限位搜索失败，返回值：" +
+                    moveResult);
+            }
+
+            while (true)
+            {
+                Thread.Sleep(
+                    PollIntervalMilliseconds);
+                ThrowIfStopRequested();
+
+                AxisMotionState state =
+                    ReadAxisMotionState(axis);
+
+                if ((state.Status & positiveLimit) != 0)
+                {
+                    throw new InvalidOperationException(
+                        GetAxisName(axis) +
+                        " 轴负向搜索过程中异常触发正限位。");
+                }
+
+                if ((state.Status & negativeLimit) != 0)
+                {
+                    float triggeredRawPosition =
+                        state.RawPosition;
+                    string stopError;
+
+                    if (!TryStopAxisAndVerify(
+                            axis,
+                            out stopError))
+                    {
+                        throw new InvalidOperationException(
+                            GetAxisName(axis) +
+                            " 轴负限位已触发，但停止确认失败：" +
+                            stopError);
+                    }
+
+                    float maximumTravel =
+                        rawZeroPosition -
+                        triggeredRawPosition;
+
+                    if (!IsFinite(maximumTravel) ||
+                        maximumTravel <= ReleaseDistance)
+                    {
+                        throw new InvalidOperationException(
+                            GetAxisName(axis) +
+                            " 轴测得的最大行程无效：" +
+                            maximumTravel.ToString("F3"));
+                    }
+
+                    ReleaseNegativeLimit(
+                        axis);
+
+                    return maximumTravel;
+                }
+
+                int stopState =
+                    FmcNative
+                        .FMC4030_Check_Axis_Is_Stop(
+                            deviceId,
+                            axis);
+
+                if (stopState == 1)
+                {
+                    throw new InvalidOperationException(
+                        GetAxisName(axis) +
+                        " 轴已走完最大搜索距离 " +
+                        MaximumRangeCalibrationDistance
+                            .ToString("F0") +
+                        "，但负限位没有触发。");
+                }
+
+                if (stopState < 0)
+                {
+                    throw new InvalidOperationException(
+                        GetAxisName(axis) +
+                        " 轴读取停止状态失败，返回值：" +
+                        stopState);
+                }
+
+                if (DateTime.UtcNow >= deadline)
+                {
+                    throw new TimeoutException(
+                        GetAxisName(axis) +
+                        " 轴标定负限位超时。");
+                }
+            }
+        }
+
+        private void ReleaseNegativeLimit(
+            int axis)
+        {
+            const uint negativeLimit = 0x0010;
+            const uint positiveLimit = 0x0020;
+
+            int moveResult =
+                FmcNative
+                    .FMC4030_Jog_Single_Axis(
+                        deviceId,
+                        axis,
+                        ReleaseDistance,
+                        SlowMoveSpeed,
+                        ZeroAcceleration,
+                        ZeroDeceleration,
+                        RelativeMove);
+
+            if (moveResult != 0)
+            {
+                throw new InvalidOperationException(
+                    GetAxisName(axis) +
+                    " 轴退出负限位失败，返回值：" +
+                    moveResult);
+            }
+
+            DateTime releaseDeadline =
+                DateTime.UtcNow.AddSeconds(
+                    MoveTimeoutSeconds);
+
+            while (true)
+            {
+                Thread.Sleep(
+                    PollIntervalMilliseconds);
+                ThrowIfStopRequested();
+
+                AxisMotionState state =
+                    ReadAxisMotionState(axis);
+
+                if ((state.Status & positiveLimit) != 0)
+                {
+                    throw new InvalidOperationException(
+                        GetAxisName(axis) +
+                        " 轴退出负限位时异常触发正限位。");
+                }
+
+                int stopState =
+                    FmcNative
+                        .FMC4030_Check_Axis_Is_Stop(
+                            deviceId,
+                            axis);
+
+                if (stopState == 1)
+                {
+                    if ((state.Status & negativeLimit) != 0)
+                    {
+                        throw new InvalidOperationException(
+                            GetAxisName(axis) +
+                            " 轴退出 " +
+                            ReleaseDistance.ToString("F0") +
+                            " 后负限位仍然触发。");
+                    }
+
+                    return;
+                }
+
+                if (stopState < 0)
+                {
+                    throw new InvalidOperationException(
+                        GetAxisName(axis) +
+                        " 轴退出负限位时读取停止状态失败，" +
+                        "返回值：" +
+                        stopState);
+                }
+
+                if (DateTime.UtcNow >= releaseDeadline)
+                {
+                    throw new TimeoutException(
+                        GetAxisName(axis) +
+                        " 轴退出负限位超时。");
+                }
             }
         }
 
@@ -1596,118 +2403,61 @@ namespace MotionHost
                     targetSoftwarePosition
                         .ToString("F3"));
 
-                float positionArgument =
-                    rawDirection;
-
-                int moveResult =
-                    FmcNative
-                        .FMC4030_Jog_Single_Axis(
-                            deviceId,
-                            axis,
-                            positionArgument,
-                            ZeroSpeed,
-                            ZeroAcceleration,
-                            ZeroDeceleration,
-                            RelativeMove);
-
-                if (moveResult != 0)
-                {
-                    throw new InvalidOperationException(
-                        "启动轴移动失败，返回值：" +
-                        moveResult);
-                }
-
                 DateTime deadline =
                     DateTime.UtcNow.AddSeconds(
                         MoveTimeoutSeconds);
 
-                while (true)
+                MoveToTargetWithApproachProfile(
+                    axis,
+                    rawZeroPosition,
+                    current.RawPosition,
+                    rawDirection,
+                    targetSoftwarePosition,
+                    minimum,
+                    maximum,
+                    deadline);
+
+                AxisMotionState state =
+                    ReadAxisMotionState(axis);
+
+                float finalSoftwarePosition =
+                    rawZeroPosition -
+                    state.RawPosition;
+
+                EnsureSoftwarePositionWithinLimits(
+                    finalSoftwarePosition,
+                    minimum,
+                    maximum,
+                    "停止后位置");
+
+                const float positionTolerance =
+                    0.05f;
+
+                if (Math.Abs(
+                    finalSoftwarePosition -
+                    targetSoftwarePosition) >
+                    positionTolerance)
                 {
-                    Thread.Sleep(
-                        PollIntervalMilliseconds);
-                    ThrowIfStopRequested();
-
-                    AxisMotionState state =
-                        ReadAxisMotionState(axis);
-
-                    float liveSoftwarePosition =
-                        rawZeroPosition -
-                        state.RawPosition;
-
-                    EnsureSoftwarePositionWithinLimits(
-                        liveSoftwarePosition,
-                        minimum,
-                        maximum,
-                        "运动中位置");
-
-                    ThrowIfPhysicalLimitBlocksMove(
-                        state.Status,
-                        rawDirection);
-
-                    stopState =
-                        FmcNative
-                            .FMC4030_Check_Axis_Is_Stop(
-                                deviceId,
-                                axis);
-
-                    if (stopState == 1)
-                    {
-                        state =
-                            ReadAxisMotionState(axis);
-
-                        float finalSoftwarePosition =
-                            rawZeroPosition -
-                            state.RawPosition;
-
-                        EnsureSoftwarePositionWithinLimits(
-                            finalSoftwarePosition,
-                            minimum,
-                            maximum,
-                            "停止后位置");
-
-                        const float positionTolerance =
-                            0.05f;
-
-                        if (Math.Abs(
-                            finalSoftwarePosition -
-                            targetSoftwarePosition) >
-                            positionTolerance)
-                        {
-                            throw new InvalidOperationException(
-                                "轴提前停止，目标位置 " +
-                                targetSoftwarePosition
-                                    .ToString("F3") +
-                                "，实际位置 " +
-                                finalSoftwarePosition
-                                    .ToString("F3") +
-                                "。");
-                        }
-
-                        result(
-                            requestId,
-                            true,
-                            0,
-                            GetAxisName(axis) +
-                            " 轴移动完成，当前位置 " +
-                            finalSoftwarePosition
-                                .ToString("F3") +
-                            "。");
-                        return;
-                    }
-
-                    if (stopState < 0)
-                    {
-                        throw new InvalidOperationException(
-                            "检查轴停止状态失败，返回值：" +
-                            stopState);
-                    }
-
-                    if (DateTime.UtcNow >= deadline)
-                    {
-                        throw new TimeoutException(
-                            "轴移动超时。");
-                    }
+                    throw new InvalidOperationException(
+                        "轴提前停止，目标位置 " +
+                        targetSoftwarePosition
+                            .ToString("F3") +
+                        "，实际位置 " +
+                        finalSoftwarePosition
+                            .ToString("F3") +
+                        "。");
                 }
+
+                result(
+                    requestId,
+                    true,
+                    0,
+                    GetAxisName(axis) +
+                    " 轴移动完成，当前位置 " +
+                    finalSoftwarePosition
+                        .ToString("F3") +
+                    "。");
+                return;
             }
             catch (OperationCanceledException exception)
             {
@@ -1744,6 +2494,226 @@ namespace MotionHost
                 }
 
                 commandFinished.Set();
+            }
+        }
+
+        private void MoveToTargetWithApproachProfile(
+            int axis,
+            float rawZeroPosition,
+            float currentRawPosition,
+            float rawDirection,
+            float targetSoftwarePosition,
+            float minimum,
+            float maximum,
+            DateTime deadline)
+        {
+            float softwareRange =
+                maximum - minimum;
+            float slowdownDistance =
+                Math.Min(
+                    SlowdownDistance,
+                    softwareRange / 2.0f);
+
+            bool approachingMinimum =
+                rawDirection > 0 &&
+                targetSoftwarePosition <=
+                    minimum + slowdownDistance;
+            bool approachingMaximum =
+                rawDirection < 0 &&
+                targetSoftwarePosition >=
+                    maximum - slowdownDistance;
+
+            if (slowdownDistance <= 0 ||
+                (!approachingMinimum &&
+                 !approachingMaximum))
+            {
+                MoveSegmentAndWait(
+                    axis,
+                    rawDirection,
+                    MoveSpeed,
+                    rawZeroPosition,
+                    minimum,
+                    maximum,
+                    rawDirection,
+                    deadline);
+                return;
+            }
+
+            float slowdownStartSoftwarePosition =
+                approachingMinimum
+                    ? minimum + slowdownDistance
+                    : maximum - slowdownDistance;
+            float slowdownStartRawPosition =
+                rawZeroPosition -
+                slowdownStartSoftwarePosition;
+            float fastDistance =
+                slowdownStartRawPosition -
+                currentRawPosition;
+
+            if ((rawDirection > 0 && fastDistance > 0) ||
+                (rawDirection < 0 && fastDistance < 0))
+            {
+                MoveSegmentAndWait(
+                    axis,
+                    fastDistance,
+                    MoveSpeed,
+                    rawZeroPosition,
+                    minimum,
+                    maximum,
+                    rawDirection,
+                    deadline);
+            }
+
+            float slowTotalDistance =
+                Math.Abs(
+                    rawZeroPosition -
+                    targetSoftwarePosition -
+                    slowdownStartRawPosition);
+
+            if (slowTotalDistance <= 0.0001f)
+            {
+                return;
+            }
+
+            while (true)
+            {
+                AxisMotionState state =
+                    ReadAxisMotionState(axis);
+                float remainingRawDistance =
+                    rawZeroPosition -
+                    targetSoftwarePosition -
+                    state.RawPosition;
+
+                if (Math.Abs(remainingRawDistance) <=
+                    0.0001f)
+                {
+                    return;
+                }
+
+                if ((rawDirection > 0 &&
+                     remainingRawDistance < 0) ||
+                    (rawDirection < 0 &&
+                     remainingRawDistance > 0))
+                {
+                    throw new InvalidOperationException(
+                        "减速段检测到轴体越过目标位置。");
+                }
+
+                float remainingDistance =
+                    Math.Abs(remainingRawDistance);
+                float speedRatio =
+                    Math.Min(
+                        1.0f,
+                        remainingDistance /
+                            slowTotalDistance);
+                float segmentSpeed =
+                    remainingDistance <=
+                        SlowdownSegmentDistance
+                        ? SlowMoveSpeed
+                        : SlowMoveSpeed +
+                            (MoveSpeed - SlowMoveSpeed) *
+                            speedRatio;
+                float segmentDistance =
+                    Math.Min(
+                        SlowdownSegmentDistance,
+                        remainingDistance);
+
+                if (remainingRawDistance < 0)
+                {
+                    segmentDistance =
+                        -segmentDistance;
+                }
+
+                MoveSegmentAndWait(
+                    axis,
+                    segmentDistance,
+                    segmentSpeed,
+                    rawZeroPosition,
+                    minimum,
+                    maximum,
+                    rawDirection,
+                    deadline);
+            }
+        }
+
+        private void MoveSegmentAndWait(
+            int axis,
+            float distance,
+            float speed,
+            float rawZeroPosition,
+            float minimum,
+            float maximum,
+            float overallDirection,
+            DateTime deadline)
+        {
+            if (Math.Abs(distance) <= 0.0001f)
+            {
+                return;
+            }
+
+            int moveResult =
+                FmcNative
+                    .FMC4030_Jog_Single_Axis(
+                        deviceId,
+                        axis,
+                        distance,
+                        speed,
+                        ZeroAcceleration,
+                        ZeroDeceleration,
+                        RelativeMove);
+
+            if (moveResult != 0)
+            {
+                throw new InvalidOperationException(
+                    "启动轴移动失败，返回值：" +
+                    moveResult);
+            }
+
+            while (true)
+            {
+                Thread.Sleep(
+                    PollIntervalMilliseconds);
+                ThrowIfStopRequested();
+
+                AxisMotionState state =
+                    ReadAxisMotionState(axis);
+                float liveSoftwarePosition =
+                    rawZeroPosition -
+                    state.RawPosition;
+
+                EnsureSoftwarePositionWithinLimits(
+                    liveSoftwarePosition,
+                    minimum,
+                    maximum,
+                    "运动中位置");
+
+                ThrowIfPhysicalLimitBlocksMove(
+                    state.Status,
+                    overallDirection);
+
+                int stopState =
+                    FmcNative
+                        .FMC4030_Check_Axis_Is_Stop(
+                            deviceId,
+                            axis);
+
+                if (stopState == 1)
+                {
+                    return;
+                }
+
+                if (stopState < 0)
+                {
+                    throw new InvalidOperationException(
+                        "检查轴停止状态失败，返回值：" +
+                        stopState);
+                }
+
+                if (DateTime.UtcNow >= deadline)
+                {
+                    throw new TimeoutException(
+                        "轴移动超时。");
+                }
             }
         }
 
@@ -1885,7 +2855,7 @@ namespace MotionHost
                         .FMC4030_Stop_Single_Axis(
                             deviceId,
                             axis,
-                            ImmediateStop);
+                            DeceleratedStop);
 
                 if (stopResult != 0)
                 {

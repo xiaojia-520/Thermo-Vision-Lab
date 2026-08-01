@@ -18,6 +18,15 @@ namespace BoxHost
         private const ushort SetpointRegisterCount = 2;
         private const ushort AlarmInputStart = 8055;
         private const ushort AlarmInputCount = 36;
+        private const ushort StartCoilAddress = 8000;
+        private const ushort StopCoilAddress = 8001;
+        private const ushort FixedTemperatureRegister = 8100;
+        private const ushort FixedHumidityRegister = 8101;
+
+        public const double MinimumTemperatureSetpoint = -100.0;
+        public const double MaximumTemperatureSetpoint = 300.0;
+        public const double MinimumHumiditySetpoint = 0.0;
+        public const double MaximumHumiditySetpoint = 100.0;
 
         private static readonly IReadOnlyDictionary<int, string>
             AlarmNames = new Dictionary<int, string>
@@ -90,6 +99,201 @@ namespace BoxHost
             }
 
             return Task.CompletedTask;
+        }
+
+        public async Task<double> SetTemperatureSetpointAsync(
+            double temperature,
+            CancellationToken cancellationToken)
+        {
+            return await SetSetpointAsync(
+                    temperature,
+                    MinimumTemperatureSetpoint,
+                    MaximumTemperatureSetpoint,
+                    FixedTemperatureRegister,
+                    SetpointRegisterStart,
+                    true,
+                    "温度",
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public async Task<double> SetHumiditySetpointAsync(
+            double humidity,
+            CancellationToken cancellationToken)
+        {
+            return await SetSetpointAsync(
+                    humidity,
+                    MinimumHumiditySetpoint,
+                    MaximumHumiditySetpoint,
+                    FixedHumidityRegister,
+                    (ushort)(SetpointRegisterStart + 1),
+                    false,
+                    "湿度",
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public async Task SetRunningAsync(
+            bool shouldRun,
+            CancellationToken cancellationToken)
+        {
+            ThrowIfDisposed();
+
+            ChamberSnapshot before =
+                await ReadSnapshotAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+            if (before.IsRunning == shouldRun)
+            {
+                Publish(before);
+                return;
+            }
+
+            if (shouldRun &&
+                (before.TotalAlarm == true ||
+                 before.ActiveAlarms.Any()))
+            {
+                throw new InvalidOperationException(
+                    "实验舱存在活动报警，禁止远程启动。");
+            }
+
+            await client.WriteSingleCoilAsync(
+                    UnitId,
+                    shouldRun
+                        ? StartCoilAddress
+                        : StopCoilAddress,
+                    true,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            const int maximumChecks = 12;
+            for (int check = 0;
+                check < maximumChecks;
+                check++)
+            {
+                await Task.Delay(
+                        TimeSpan.FromMilliseconds(250),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                ushort[] work =
+                    await client.ReadInputRegistersAsync(
+                            UnitId,
+                            WorkRegisterStart,
+                            1,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+
+                if ((work[0] == 1) == shouldRun)
+                {
+                    ChamberSnapshot snapshot =
+                        await ReadSnapshotAsync(
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                    Publish(snapshot);
+                    return;
+                }
+            }
+
+            throw new TimeoutException(
+                shouldRun
+                    ? "启动命令已发送，但没有确认实验舱进入运行状态。"
+                    : "停止命令已发送，但没有确认实验舱停止。");
+        }
+
+        private async Task<double> SetSetpointAsync(
+            double value,
+            double minimum,
+            double maximum,
+            ushort writeRegister,
+            ushort readbackRegister,
+            bool signedValue,
+            string valueName,
+            CancellationToken cancellationToken)
+        {
+            ThrowIfDisposed();
+
+            if (double.IsNaN(value) ||
+                double.IsInfinity(value) ||
+                value < minimum ||
+                value > maximum)
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(value),
+                    valueName + "设定值必须在 " +
+                    minimum.ToString("F1") + " 到 " +
+                    maximum.ToString("F1") + " 之间。");
+            }
+
+            double scaledValue = value * 10.0;
+            int roundedValue = (int)Math.Round(
+                scaledValue,
+                MidpointRounding.AwayFromZero);
+            if (Math.Abs(scaledValue - roundedValue) >
+                0.000001)
+            {
+                throw new ArgumentException(
+                    valueName + "设定值最多保留一位小数。",
+                    nameof(value));
+            }
+
+            ushort rawValue = signedValue
+                ? unchecked((ushort)(short)roundedValue)
+                : checked((ushort)roundedValue);
+
+            await client.WriteSingleRegisterAsync(
+                    UnitId,
+                    writeRegister,
+                    rawValue,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            ushort[] holdingReadback =
+                await client.ReadHoldingRegistersAsync(
+                        UnitId,
+                        writeRegister,
+                        1,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            if (holdingReadback[0] != rawValue)
+            {
+                throw new InvalidOperationException(
+                    valueName +
+                    "写入应答成功，但保持寄存器回读不一致。");
+            }
+
+            const int maximumChecks = 10;
+            for (int check = 0;
+                check < maximumChecks;
+                check++)
+            {
+                ushort[] inputReadback =
+                    await client.ReadInputRegistersAsync(
+                            UnitId,
+                            readbackRegister,
+                            1,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+
+                if (inputReadback[0] == rawValue)
+                {
+                    ChamberSnapshot snapshot =
+                        await ReadSnapshotAsync(
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                    Publish(snapshot);
+                    return roundedValue / 10.0;
+                }
+
+                await Task.Delay(
+                        TimeSpan.FromMilliseconds(200),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            throw new InvalidOperationException(
+                valueName +
+                "保持寄存器已更新，但设备显示设定值没有同步。");
         }
 
         private async Task PollingLoopAsync(
@@ -259,7 +463,7 @@ namespace BoxHost
                 IsConnected = true,
                 ConnectionMessage =
                     string.IsNullOrEmpty(optionalMessage)
-                        ? "通讯正常（只读）"
+                        ? "通讯正常"
                         : optionalMessage,
                 ReceivedAt = DateTime.Now,
                 IsRunning = isRunning,
@@ -344,7 +548,7 @@ namespace BoxHost
 
             if (exception is TimeoutException)
             {
-                return "连接或读取超时";
+                return "连接或通信超时";
             }
 
             if (exception is SocketException)

@@ -65,7 +65,7 @@
                 <StackPanel Grid.Column="1"
                             Margin="18,0,0,0"
                             VerticalAlignment="Center">
-                    <TextBlock Text="实验舱监控"
+                    <TextBlock Text="实验舱监控与控制"
                                Foreground="#17233A"
                                FontSize="22"
                                FontWeight="SemiBold"/>
@@ -79,10 +79,10 @@
                             Orientation="Horizontal"
                             VerticalAlignment="Center">
                     <Border Padding="10,5"
-                            Background="#FFF6E7"
+                            Background="#E9F7EF"
                             CornerRadius="12">
-                        <TextBlock Text="只读模式"
-                                   Foreground="#B66A00"
+                        <TextBlock Text="监控与控制"
+                                   Foreground="#26734A"
                                    FontSize="11"
                                    FontWeight="SemiBold"/>
                     </Border>
@@ -203,89 +203,176 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="14"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="1"/>
+                        <RowDefinition Height="10"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="6"/>
                         <RowDefinition Height="*"/>
                         <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
-                    <TextBlock Text="部件状态"
+                    <TextBlock Text="实验舱控制"
                                Foreground="#17233A"
                                FontSize="16"
                                FontWeight="SemiBold"/>
+
                     <Grid Grid.Row="2">
                         <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="18"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel>
+                            <TextBlock Text="目标温度（℃）"
+                                       Style="{StaticResource LabelStyle}"/>
+                            <Grid Margin="0,5,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="76"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="TemperatureSetpointTextBox"
+                                         Height="30"
+                                         VerticalContentAlignment="Center"/>
+                                <Button x:Name="SetTemperatureButton"
+                                        Grid.Column="2"
+                                        Height="30"
+                                        Content="写入温度"
+                                        IsEnabled="False"
+                                        Click="SetTemperatureButton_Click"/>
+                            </Grid>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="目标湿度（%RH）"
+                                       Style="{StaticResource LabelStyle}"/>
+                            <Grid Margin="0,5,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="76"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBox x:Name="HumiditySetpointTextBox"
+                                         Height="30"
+                                         VerticalContentAlignment="Center"/>
+                                <Button x:Name="SetHumidityButton"
+                                        Grid.Column="2"
+                                        Height="30"
+                                        Content="写入湿度"
+                                        IsEnabled="False"
+                                        Click="SetHumidityButton_Click"/>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Button x:Name="StartChamberButton"
+                                Height="34"
+                                Content="启动实验舱"
+                                Foreground="White"
+                                Background="#26834A"
+                                BorderThickness="0"
+                                IsEnabled="False"
+                                Click="StartChamberButton_Click"/>
+                        <Button x:Name="StopChamberButton"
+                                Grid.Column="2"
+                                Height="34"
+                                Content="停止实验舱"
+                                Foreground="White"
+                                Background="#C65337"
+                                BorderThickness="0"
+                                IsEnabled="False"
+                                Click="StopChamberButton_Click"/>
+                    </Grid>
+
+                    <TextBlock x:Name="CommandStatusText"
+                               Grid.Row="6"
+                               Text="连接成功后可以设置温湿度并启停设备。"
+                               Foreground="#718096"
+                               FontSize="11"
+                               TextWrapping="Wrap"/>
+
+                    <Border Grid.Row="8"
+                            Background="#E6EBF2"/>
+
+                    <TextBlock Grid.Row="10"
+                               Text="部件状态（当前固件可能不提供）"
+                               Foreground="#718096"
+                               FontSize="11"
+                               FontWeight="SemiBold"/>
+
+                    <Grid Grid.Row="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="*"/>
                         </Grid.ColumnDefinitions>
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="*"/>
-                            <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Row="0"
-                                   Text="压缩机"
-                                   Style="{StaticResource LabelStyle}"/>
-                        <TextBlock x:Name="CompressorText"
-                                   Grid.Row="0"
-                                   HorizontalAlignment="Right"
-                                   Text="--"
-                                   Style="{StaticResource ValueStyle}"/>
-
-                        <TextBlock Grid.Row="1"
-                                   Text="温度控制"
-                                   Style="{StaticResource LabelStyle}"/>
-                        <TextBlock x:Name="TemperatureControlText"
-                                   Grid.Row="1"
-                                   HorizontalAlignment="Right"
-                                   Text="--"
-                                   Style="{StaticResource ValueStyle}"/>
-
-                        <TextBlock Grid.Row="2"
-                                   Text="排水"
-                                   Style="{StaticResource LabelStyle}"/>
-                        <TextBlock x:Name="DrainText"
-                                   Grid.Row="2"
-                                   HorizontalAlignment="Right"
-                                   Text="--"
-                                   Style="{StaticResource ValueStyle}"/>
-
-                        <TextBlock Grid.Row="0"
-                                   Grid.Column="1"
-                                   Margin="34,0,0,0"
-                                   Text="湿度控制"
-                                   Style="{StaticResource LabelStyle}"/>
-                        <TextBlock x:Name="HumidityControlText"
-                                   Grid.Row="0"
-                                   Grid.Column="1"
-                                   HorizontalAlignment="Right"
-                                   Text="--"
-                                   Style="{StaticResource ValueStyle}"/>
-
-                        <TextBlock Grid.Row="1"
-                                   Grid.Column="1"
-                                   Margin="34,0,0,0"
-                                   Text="照明"
-                                   Style="{StaticResource LabelStyle}"/>
-                        <TextBlock x:Name="LightText"
-                                   Grid.Row="1"
-                                   Grid.Column="1"
-                                   HorizontalAlignment="Right"
-                                   Text="--"
-                                   Style="{StaticResource ValueStyle}"/>
-
-                        <TextBlock Grid.Row="2"
-                                   Grid.Column="1"
-                                   Margin="34,0,0,0"
-                                   Text="程序结束"
-                                   Style="{StaticResource LabelStyle}"/>
-                        <TextBlock x:Name="ProgramEndText"
-                                   Grid.Row="2"
-                                   Grid.Column="1"
-                                   HorizontalAlignment="Right"
-                                   Text="--"
-                                   Style="{StaticResource ValueStyle}"/>
+                        <StackPanel Grid.Row="0">
+                            <TextBlock Text="压缩机"
+                                       Style="{StaticResource LabelStyle}"/>
+                            <TextBlock x:Name="CompressorText"
+                                       Text="--"
+                                       FontSize="12"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="0"
+                                    Grid.Column="1">
+                            <TextBlock Text="温度控制"
+                                       Style="{StaticResource LabelStyle}"/>
+                            <TextBlock x:Name="TemperatureControlText"
+                                       Text="--"
+                                       FontSize="12"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="0"
+                                    Grid.Column="2">
+                            <TextBlock Text="湿度控制"
+                                       Style="{StaticResource LabelStyle}"/>
+                            <TextBlock x:Name="HumidityControlText"
+                                       Text="--"
+                                       FontSize="12"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1">
+                            <TextBlock Text="排水"
+                                       Style="{StaticResource LabelStyle}"/>
+                            <TextBlock x:Name="DrainText"
+                                       Text="--"
+                                       FontSize="12"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1"
+                                    Grid.Column="1">
+                            <TextBlock Text="照明"
+                                       Style="{StaticResource LabelStyle}"/>
+                            <TextBlock x:Name="LightText"
+                                       Text="--"
+                                       FontSize="12"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1"
+                                    Grid.Column="2">
+                            <TextBlock Text="程序结束"
+                                       Style="{StaticResource LabelStyle}"/>
+                            <TextBlock x:Name="ProgramEndText"
+                                       Text="--"
+                                       FontSize="12"/>
+                        </StackPanel>
                     </Grid>
+
                     <TextBlock x:Name="LastUpdateText"
-                               Grid.Row="3"
+                               Grid.Row="13"
                                Text="尚未收到设备数据"
                                Foreground="#8A97A9"
                                FontSize="11"/>
@@ -327,7 +414,7 @@
                                LineHeight="20"/>
                     <TextBlock x:Name="MonitoringStatusText"
                                Grid.Row="5"
-                               Text="正在建立只读连接…"
+                               Text="正在建立实验舱连接…"
                                Foreground="#8A97A9"
                                FontSize="11"
                                TextWrapping="Wrap"/>

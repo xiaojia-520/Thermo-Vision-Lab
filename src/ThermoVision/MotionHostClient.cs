@@ -82,6 +82,20 @@ namespace ThermoVision
         }
 
         internal async Task<MotionHostResult>
+            RunRangeCalibrationAsync(
+                int controllerNumber)
+        {
+            ValidateControllerNumber(
+                controllerNumber);
+
+            return await SendRequestAsync(
+                "CALIBRATE_RANGE",
+                controllerNumber,
+                TimeSpan.FromMinutes(65),
+                true);
+        }
+
+        internal async Task<MotionHostResult>
             StopAsync(
                 int controllerNumber)
         {
@@ -91,6 +105,16 @@ namespace ThermoVision
             return await SendRequestAsync(
                 "STOP",
                 controllerNumber,
+                TimeSpan.FromSeconds(10),
+                false);
+        }
+
+        internal async Task<MotionHostResult>
+            StopAllAsync()
+        {
+            return await SendRequestAsync(
+                "STOP_ALL",
+                0,
                 TimeSpan.FromSeconds(10),
                 false);
         }
@@ -262,11 +286,9 @@ namespace ThermoVision
                         PipeDirection.InOut,
                         PipeOptions.Asynchronous);
 
-                await Task.Run(
-                    delegate
-                    {
-                        clientPipe.Connect(8000);
-                    });
+                await ConnectToMotionHostAsync(
+                    clientPipe,
+                    process);
 
                 pipe = clientPipe;
                 reader =
@@ -325,6 +347,64 @@ namespace ThermoVision
                 activeProcess = null;
                 throw;
             }
+        }
+
+        private static async Task ConnectToMotionHostAsync(
+            NamedPipeClientStream clientPipe,
+            Process process)
+        {
+            DateTime deadline =
+                DateTime.UtcNow.AddSeconds(8);
+
+            while (!clientPipe.IsConnected)
+            {
+                if (process.HasExited)
+                {
+                    throw CreateStartupException(
+                        process.ExitCode);
+                }
+
+                try
+                {
+                    await Task.Run(
+                        delegate
+                        {
+                            clientPipe.Connect(250);
+                        });
+                }
+                catch (TimeoutException)
+                {
+                    if (process.HasExited)
+                    {
+                        throw CreateStartupException(
+                            process.ExitCode);
+                    }
+
+                    if (DateTime.UtcNow >= deadline)
+                    {
+                        throw new TimeoutException(
+                            "运动控制服务连接超时。请检查是否有残留的 " +
+                            "MotionHost.exe 进程。");
+                    }
+                }
+            }
+        }
+
+        private static Exception CreateStartupException(
+            int exitCode)
+        {
+            if (exitCode == 7)
+            {
+                return new InvalidOperationException(
+                    "已有 MotionHost 正在占用电机控制器。" +
+                    "如果主程序已经关闭，请结束残留的 " +
+                    "MotionHost.exe 后重试。");
+            }
+
+            return new InvalidOperationException(
+                "运动控制服务启动失败，退出码：" +
+                exitCode +
+                "。");
         }
 
         private async Task<MotionHostResult>

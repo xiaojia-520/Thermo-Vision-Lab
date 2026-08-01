@@ -9,8 +9,10 @@ namespace MotionHost
         private const uint PositiveLimit = 0x0020;
 
         private const int RelativeMove = 1;
-        private const int ImmediateStop = 2;
+        private const int DeceleratedStop = 1;
         private const int PollIntervalMilliseconds = 50;
+        private const float SlowdownDistance = 10.0f;
+        private const float ProfileMinimumSpeed = 1.0f;
 
         private bool isEstablished;
         private float rawZeroPosition;
@@ -41,6 +43,7 @@ namespace MotionHost
             float speed,
             float acceleration,
             float deceleration,
+            float? knownRawZeroPosition,
             float releaseDistance,
             float maximumSeekDistance,
             TimeSpan moveTimeout)
@@ -53,6 +56,13 @@ namespace MotionHost
                 releaseDistance,
                 maximumSeekDistance,
                 moveTimeout);
+
+            if (knownRawZeroPosition.HasValue &&
+                !IsFinite(knownRawZeroPosition.Value))
+            {
+                throw new ArgumentOutOfRangeException(
+                    nameof(knownRawZeroPosition));
+            }
 
             EnsureAxisStopped(deviceId, axis);
 
@@ -67,15 +77,15 @@ namespace MotionHost
                         " 轴当前压在正限位，先向负方向退出 " +
                         releaseDistance.ToString("F3") + " 个控制器单位。");
 
-                    MoveRelativeAndWait(
+                    ReleaseFromPositiveLimit(
                         deviceId,
                         axis,
-                        -releaseDistance,
+                        releaseDistance,
                         speed,
                         acceleration,
                         deceleration,
-                        moveTimeout,
-                        true);
+                        knownRawZeroPosition.HasValue,
+                        moveTimeout);
 
                     AxisSnapshot released =
                         ReadSnapshot(deviceId, axis);
@@ -99,6 +109,7 @@ namespace MotionHost
                     speed,
                     acceleration,
                     deceleration,
+                    knownRawZeroPosition,
                     moveTimeout);
 
                 ThrowIfCancellationRequested();
@@ -126,15 +137,15 @@ namespace MotionHost
 
                 ThrowIfCancellationRequested();
 
-                MoveRelativeAndWait(
+                ReleaseFromPositiveLimit(
                     deviceId,
                     axis,
-                    -releaseDistance,
+                    releaseDistance,
                     speed,
                     acceleration,
                     deceleration,
-                    moveTimeout,
-                    true);
+                    knownRawZeroPosition.HasValue,
+                    moveTimeout);
 
                 AxisSnapshot finalSnapshot =
                     ReadSnapshot(deviceId, axis);
@@ -159,7 +170,7 @@ namespace MotionHost
             catch
             {
                 isEstablished = false;
-                StopImmediately(deviceId, axis);
+                StopWithDeceleration(deviceId, axis);
                 throw;
             }
         }
@@ -180,8 +191,13 @@ namespace MotionHost
             int deviceId,
             int axis)
         {
+            RequestCancellation();
+            StopWithDeceleration(deviceId, axis);
+        }
+
+        internal void RequestCancellation()
+        {
             cancellationRequested = true;
-            StopImmediately(deviceId, axis);
         }
 
         private void SeekPositiveLimit(
@@ -191,6 +207,7 @@ namespace MotionHost
             float speed,
             float acceleration,
             float deceleration,
+            float? knownRawZeroPosition,
             TimeSpan timeout)
         {
             AxisSnapshot before = ReadSnapshot(deviceId, axis);
@@ -199,6 +216,20 @@ namespace MotionHost
             {
                 throw new InvalidOperationException(
                     "寻找正限位前，正限位必须处于释放状态。");
+            }
+
+            if (knownRawZeroPosition.HasValue)
+            {
+                SeekPositiveLimitWithProfile(
+                    deviceId,
+                    axis,
+                    distance,
+                    speed,
+                    acceleration,
+                    deceleration,
+                    knownRawZeroPosition.Value,
+                    timeout);
+                return;
             }
 
             int moveResult =
@@ -241,12 +272,12 @@ namespace MotionHost
                         FmcNative.FMC4030_Stop_Single_Axis(
                             deviceId,
                             axis,
-                            ImmediateStop);
+                            DeceleratedStop);
 
                     if (stopResult != 0)
                     {
                         throw new InvalidOperationException(
-                            "正限位触发，但立即停止命令失败，返回值：" +
+                            "正限位触发，但减速停止命令失败，返回值：" +
                             stopResult);
                     }
 
@@ -280,6 +311,257 @@ namespace MotionHost
                         "寻找正限位超时。");
                 }
             }
+        }
+
+        private void SeekPositiveLimitWithProfile(
+            int deviceId,
+            int axis,
+            float maximumSeekDistance,
+            float maximumSpeed,
+            float acceleration,
+            float deceleration,
+            float knownRawZeroPosition,
+            TimeSpan timeout)
+        {
+            AxisSnapshot start = ReadSnapshot(deviceId, axis);
+            float distanceToReference =
+                knownRawZeroPosition - start.RawPosition;
+            float minimumSpeed = Math.Min(
+                ProfileMinimumSpeed,
+                maximumSpeed);
+
+            if (distanceToReference <= 0 ||
+                distanceToReference >
+                    maximumSeekDistance)
+            {
+                Console.WriteLine(
+                    "已保存 P0 与当前位置不匹配，改用速度 " +
+                    minimumSpeed.ToString("F3") +
+                    " 安全寻找正限位。");
+
+                StartPositiveSeekAndWait(
+                    deviceId,
+                    axis,
+                    maximumSeekDistance,
+                    minimumSpeed,
+                    acceleration,
+                    deceleration,
+                    timeout);
+                return;
+            }
+
+            if (distanceToReference >
+                SlowdownDistance)
+            {
+                float fastDistance =
+                    distanceToReference -
+                    SlowdownDistance;
+
+                Console.WriteLine(
+                    "距正限位 " +
+                    distanceToReference.ToString("F3") +
+                    "，先以速度 " +
+                    maximumSpeed.ToString("F3") +
+                    " 移动到最后 10 个单位边界。");
+
+                MoveRelativeAndWait(
+                    deviceId,
+                    axis,
+                    fastDistance,
+                    maximumSpeed,
+                    acceleration,
+                    deceleration,
+                    timeout,
+                    false);
+            }
+
+            AxisSnapshot slowStart =
+                ReadSnapshot(deviceId, axis);
+            float remainingToReference =
+                knownRawZeroPosition -
+                slowStart.RawPosition;
+            float movedDistance =
+                slowStart.RawPosition -
+                start.RawPosition;
+            float remainingSearchDistance =
+                maximumSeekDistance - movedDistance;
+            float slowSeekDistance = Math.Min(
+                remainingSearchDistance,
+                Math.Max(
+                    SlowdownDistance,
+                    remainingToReference) +
+                2.0f);
+
+            Console.WriteLine(
+                "进入正限位安全区，最后约 10 个单位" +
+                "固定使用速度 " +
+                minimumSpeed.ToString("F3") +
+                " 寻找正限位。");
+
+            StartPositiveSeekAndWait(
+                deviceId,
+                axis,
+                slowSeekDistance,
+                minimumSpeed,
+                acceleration,
+                deceleration,
+                timeout);
+        }
+
+        private void ReleaseFromPositiveLimit(
+            int deviceId,
+            int axis,
+            float releaseDistance,
+            float maximumSpeed,
+            float acceleration,
+            float deceleration,
+            bool useProfile,
+            TimeSpan timeout)
+        {
+            if (useProfile &&
+                maximumSpeed > ProfileMinimumSpeed &&
+                releaseDistance > SlowdownDistance)
+            {
+                float fastDistance =
+                    releaseDistance -
+                    SlowdownDistance;
+
+                Console.WriteLine(
+                    "正限位退出前 " +
+                    fastDistance.ToString("F3") +
+                    " 个单位使用速度 " +
+                    maximumSpeed.ToString("F3") +
+                    "，最后 10 个单位使用速度 " +
+                    ProfileMinimumSpeed.ToString("F3") +
+                    "。");
+
+                MoveRelativeAndWait(
+                    deviceId,
+                    axis,
+                    -fastDistance,
+                    maximumSpeed,
+                    acceleration,
+                    deceleration,
+                    timeout,
+                    true);
+
+                MoveRelativeAndWait(
+                    deviceId,
+                    axis,
+                    -SlowdownDistance,
+                    ProfileMinimumSpeed,
+                    acceleration,
+                    deceleration,
+                    timeout,
+                    true);
+                return;
+            }
+
+            MoveRelativeAndWait(
+                deviceId,
+                axis,
+                -releaseDistance,
+                maximumSpeed,
+                acceleration,
+                deceleration,
+                timeout,
+                true);
+        }
+
+        private void StartPositiveSeekAndWait(
+            int deviceId,
+            int axis,
+            float distance,
+            float speed,
+            float acceleration,
+            float deceleration,
+            TimeSpan timeout)
+        {
+            int moveResult =
+                FmcNative.FMC4030_Jog_Single_Axis(
+                    deviceId,
+                    axis,
+                    distance,
+                    speed,
+                    acceleration,
+                    deceleration,
+                    RelativeMove);
+
+            if (moveResult != 0)
+            {
+                throw new InvalidOperationException(
+                    "启动连续正限位搜索失败，返回值：" +
+                    moveResult);
+            }
+
+            DateTime deadline = DateTime.UtcNow.Add(timeout);
+
+            while (true)
+            {
+                Thread.Sleep(PollIntervalMilliseconds);
+                ThrowIfCancellationRequested();
+
+                AxisSnapshot snapshot = ReadSnapshot(deviceId, axis);
+                if (snapshot.PositiveLimitActive)
+                {
+                    StopAtPositiveLimit(deviceId, axis);
+                    return;
+                }
+
+                int stopState =
+                    FmcNative.FMC4030_Check_Axis_Is_Stop(
+                        deviceId,
+                        axis);
+
+                if (stopState == 1)
+                {
+                    throw new InvalidOperationException(
+                        "轴已停止，但正限位没有触发。");
+                }
+
+                if (stopState < 0)
+                {
+                    throw new InvalidOperationException(
+                        "检查轴停止状态失败，返回值：" +
+                        stopState);
+                }
+
+                if (DateTime.UtcNow >= deadline)
+                {
+                    throw new TimeoutException(
+                        "连续正限位搜索超时。");
+                }
+            }
+        }
+
+        private void StopAtPositiveLimit(
+            int deviceId,
+            int axis)
+        {
+            int stopResult =
+                FmcNative.FMC4030_Stop_Single_Axis(
+                    deviceId,
+                    axis,
+                    DeceleratedStop);
+
+            if (stopResult != 0)
+            {
+                throw new InvalidOperationException(
+                    "正限位触发，但减速停止命令失败，返回值：" +
+                    stopResult);
+            }
+
+            WaitUntilStopped(
+                deviceId,
+                axis,
+                TimeSpan.FromSeconds(3));
+        }
+
+        private static bool IsFinite(
+            float value)
+        {
+            return !float.IsNaN(value) &&
+                !float.IsInfinity(value);
         }
 
         private void MoveRelativeAndWait(
@@ -475,7 +757,7 @@ namespace MotionHost
             }
         }
 
-        private static void StopImmediately(
+        private static void StopWithDeceleration(
             int deviceId,
             int axis)
         {
@@ -484,7 +766,7 @@ namespace MotionHost
                 FmcNative.FMC4030_Stop_Single_Axis(
                     deviceId,
                     axis,
-                    ImmediateStop);
+                    DeceleratedStop);
             }
             catch
             {

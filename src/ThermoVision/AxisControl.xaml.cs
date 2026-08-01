@@ -25,6 +25,7 @@ namespace ThermoVision
 
         private Task monitoringTask;
         private int selectedControllerNumber = 1;
+        private bool stopAllInProgress;
         private bool updatingAxisSelection;
         private bool updatingOperationInputs;
         private bool targetInputDirty;
@@ -479,62 +480,127 @@ namespace ThermoVision
             }
         }
 
+        private async void ControllerRangeButton_Click(
+            object sender,
+            RoutedEventArgs eventArgs)
+        {
+            int controllerNumber =
+                selectedControllerNumber;
+
+            string axisSummary =
+                controllerNumber == 3
+                    ? "X、Y、Z"
+                    : "X、Y";
+
+            string controllerIp =
+                "192.168.1." +
+                (30 + controllerNumber).ToString();
+
+            MessageBoxResult confirmation =
+                MessageBox.Show(
+                    controllerNumber +
+                    " 号控制器（" + controllerIp + "）的 " +
+                    axisSummary +
+                    " 轴将依次以速度 1 向负限位真实运动。" +
+                    Environment.NewLine +
+                    "每个轴触发负限位后会立即停止、记录最大行程，" +
+                    "再向正方向退出 30 个控制器单位。" +
+                    Environment.NewLine +
+                    "该过程可能持续较长时间，请确认现场无人、" +
+                    "负限位有效且急停可用。",
+                    "确认标定负限位和最大行程",
+                    MessageBoxButton.OKCancel,
+                    MessageBoxImage.Warning);
+
+            if (confirmation != MessageBoxResult.OK)
+            {
+                MotionStatusText.Text =
+                    "已取消负限位标定";
+                return;
+            }
+
+            controllerBusy[
+                controllerNumber] = true;
+            RefreshButtonStates();
+
+            MotionStatusText.Text =
+                "正在标定 " +
+                controllerNumber +
+                " 号控制器的负限位和最大行程……";
+
+            try
+            {
+                MotionHostResult result =
+                    await motionHostClient
+                        .RunRangeCalibrationAsync(
+                            controllerNumber);
+
+                MotionStatusText.Text =
+                    result.Output;
+
+                if (result.Success)
+                {
+                    MessageBox.Show(
+                        result.Output,
+                        "负限位和最大行程标定完成",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                }
+                else
+                {
+                    MessageBox.Show(
+                        result.Output,
+                        "负限位标定失败",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Error);
+                }
+            }
+            catch (Exception exception)
+            {
+                MotionStatusText.Text =
+                    "负限位标定错误：" +
+                    exception.Message;
+
+                MessageBox.Show(
+                    exception.Message,
+                    "负限位标定错误",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                controllerBusy[
+                    controllerNumber] = false;
+                RefreshButtonStates();
+            }
+        }
+
         private async void StopAllButton_Click(
             object sender,
             RoutedEventArgs eventArgs)
         {
+            if (stopAllInProgress)
+            {
+                return;
+            }
+
+            stopAllInProgress = true;
+            RefreshButtonStates();
             MotionStatusText.Text =
                 "正在向三个控制器发送停止命令并确认停止状态……";
 
-            List<Task<MotionHostResult>> commands =
-                new List<Task<MotionHostResult>>();
-
-            for (int controllerNumber = 1;
-                controllerNumber <= 3;
-                controllerNumber++)
-            {
-                commands.Add(
-                    motionHostClient.StopAsync(
-                        controllerNumber));
-            }
-
             try
             {
-                MotionHostResult[] results =
-                    await Task.WhenAll(commands);
-                List<string> failures =
-                    new List<string>();
+                MotionHostResult result =
+                    await motionHostClient.StopAllAsync();
 
-                for (int index = 0;
-                    index < results.Length;
-                    index++)
-                {
-                    if (!results[index].Success)
-                    {
-                        failures.Add(
-                            (index + 1) +
-                            " 号轴：" +
-                            results[index].Output);
-                    }
-                }
+                MotionStatusText.Text =
+                    result.Output;
 
-                if (failures.Count == 0)
+                if (!result.Success)
                 {
-                    MotionStatusText.Text =
-                        "三个控制器均已确认停止。";
-                }
-                else
-                {
-                    string message =
-                        "以下控制器未能确认停止：" +
-                        Environment.NewLine +
-                        string.Join(
-                            Environment.NewLine,
-                            failures.ToArray());
-
-                    MotionStatusText.Text = message;
                     MessageBox.Show(
-                        message +
+                        result.Output +
                         Environment.NewLine +
                         "请立即检查现场并使用硬件急停。",
                         "停止状态未确认",
@@ -547,6 +613,11 @@ namespace ThermoVision
                 MotionStatusText.Text =
                     "发送停止命令失败：" +
                     exception.Message;
+            }
+            finally
+            {
+                stopAllInProgress = false;
+                RefreshButtonStates();
             }
         }
 
@@ -959,7 +1030,8 @@ namespace ThermoVision
                 selectedControllerNumber;
             bool busy =
                 controllerBusy[
-                    controllerNumber];
+                    controllerNumber] ||
+                stopAllInProgress;
             bool fresh =
                 IsStatusFresh(
                     controllerNumber);
@@ -979,6 +1051,11 @@ namespace ThermoVision
             SelectedControllerHomeButton.IsEnabled =
                 !busy &&
                 controllerSafelyStopped;
+            SelectedControllerRangeButton.IsEnabled =
+                !busy &&
+                controllerSafelyStopped &&
+                AreAllControllerAxesReadyForRangeCalibration(
+                    controller);
 
             int axis =
                 GetSelectedOperationAxis();
@@ -1025,6 +1102,8 @@ namespace ThermoVision
                 monitoringTask != null &&
                 monitoringTask.Status ==
                     TaskStatus.RanToCompletion;
+            StopAllButton.IsEnabled =
+                !stopAllInProgress;
 
             if (busy)
             {
@@ -1125,6 +1204,38 @@ namespace ThermoVision
                 !axis.IsPaused &&
                 !axis.IsHoming &&
                 !axis.IsHomeOvertime;
+        }
+
+        private static bool
+            AreAllControllerAxesReadyForRangeCalibration(
+                MotionControllerStatus controller)
+        {
+            const float expectedPosition = 30.0f;
+            const float positionTolerance = 1.0f;
+
+            if (controller == null ||
+                controller.Axes == null ||
+                controller.Axes.Length == 0)
+            {
+                return false;
+            }
+
+            foreach (MotionAxisStatus axis
+                in controller.Axes)
+            {
+                if (!axis.HasSoftwareZero ||
+                    axis.IsNegativeLimitActive ||
+                    axis.IsPositiveLimitActive ||
+                    Math.Abs(
+                        axis.SoftwarePosition -
+                        expectedPosition) >
+                        positionTolerance)
+                {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private static bool

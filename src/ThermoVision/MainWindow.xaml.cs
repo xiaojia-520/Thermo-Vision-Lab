@@ -1,14 +1,23 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace ThermoVision
 {
     public partial class MainWindow : Window
     {
         private const int RestoreWindow = 9;
+        private const string InfraredCameraIp =
+            "192.168.1.201";
+
+        private readonly DispatcherTimer
+            infraredConnectionTimer;
+        private bool infraredConnectionCheckRunning;
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
@@ -24,12 +33,23 @@ namespace ThermoVision
         public MainWindow()
         {
             InitializeComponent();
+
+            infraredConnectionTimer =
+                new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(2)
+                };
+            infraredConnectionTimer.Tick +=
+                InfraredConnectionTimer_Tick;
         }
 
         private async void MainWindow_Loaded(
             object sender,
             RoutedEventArgs eventArgs)
         {
+            infraredConnectionTimer.Start();
+            await RefreshInfraredConnectionAsync();
+
             try
             {
                 await ChamberControlView
@@ -39,6 +59,81 @@ namespace ThermoVision
             {
                 // ChamberControl 页面会持续显示连接状态。
             }
+        }
+
+        private async void InfraredConnectionTimer_Tick(
+            object sender,
+            EventArgs eventArgs)
+        {
+            await RefreshInfraredConnectionAsync();
+        }
+
+        private async System.Threading.Tasks.Task
+            RefreshInfraredConnectionAsync()
+        {
+            if (infraredConnectionCheckRunning)
+            {
+                return;
+            }
+
+            infraredConnectionCheckRunning = true;
+
+            try
+            {
+                bool connected;
+                using (Ping ping = new Ping())
+                {
+                    PingReply reply =
+                        await ping.SendPingAsync(
+                            InfraredCameraIp,
+                            800);
+                    connected =
+                        reply.Status ==
+                        IPStatus.Success;
+                }
+
+                ApplyInfraredConnectionState(
+                    connected);
+            }
+            catch
+            {
+                ApplyInfraredConnectionState(false);
+            }
+            finally
+            {
+                infraredConnectionCheckRunning = false;
+            }
+        }
+
+        private void ApplyInfraredConnectionState(
+            bool connected)
+        {
+            InfraredConnectionText.Text =
+                connected
+                    ? "已连接"
+                    : "未连接";
+            InfraredConnectionText.Foreground =
+                new SolidColorBrush(
+                    connected
+                        ? Color.FromRgb(
+                            38,
+                            131,
+                            74)
+                        : Color.FromRgb(
+                            190,
+                            54,
+                            54));
+            InfraredConnectionBadge.Background =
+                new SolidColorBrush(
+                    connected
+                        ? Color.FromRgb(
+                            234,
+                            247,
+                            239)
+                        : Color.FromRgb(
+                            253,
+                            238,
+                            238));
         }
 
         private async void AxisControlButton_Click(
@@ -229,6 +324,9 @@ namespace ThermoVision
         protected override void OnClosed(
             EventArgs eventArgs)
         {
+            infraredConnectionTimer.Stop();
+            infraredConnectionTimer.Tick -=
+                InfraredConnectionTimer_Tick;
             AxisControlView.Shutdown();
             ChamberControlView.Shutdown();
             base.OnClosed(eventArgs);

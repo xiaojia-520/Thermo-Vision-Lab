@@ -7,9 +7,10 @@ using System.Threading.Tasks;
 namespace BoxHost
 {
     /// <summary>
-    /// Minimal read-only Modbus TCP client.
-    /// Only FC02, FC03 and FC04 are exposed; this class cannot issue write
-    /// commands.
+    /// Minimal Modbus TCP client for the chamber integration.
+    /// Reading uses FC02, FC03 and FC04. The only exposed writes are the
+    /// single-coil and single-register operations required by the verified
+    /// chamber controls (FC05 and FC06).
     /// </summary>
     public sealed class ModbusTcpClient : IDisposable
     {
@@ -170,6 +171,38 @@ namespace BoxHost
             return values;
         }
 
+        public async Task WriteSingleCoilAsync(
+            byte unitId,
+            ushort address,
+            bool value,
+            CancellationToken cancellationToken)
+        {
+            await ExecuteWriteAsync(
+                    unitId,
+                    0x05,
+                    address,
+                    value
+                        ? (ushort)0xFF00
+                        : (ushort)0x0000,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public async Task WriteSingleRegisterAsync(
+            byte unitId,
+            ushort address,
+            ushort value,
+            CancellationToken cancellationToken)
+        {
+            await ExecuteWriteAsync(
+                    unitId,
+                    0x06,
+                    address,
+                    value,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         public void Disconnect()
         {
             CloseConnection();
@@ -210,6 +243,57 @@ namespace BoxHost
                         requestTransactionId,
                         unitId,
                         functionCode,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                CloseConnection();
+                throw;
+            }
+            finally
+            {
+                requestLock.Release();
+            }
+        }
+
+        private async Task ExecuteWriteAsync(
+            byte unitId,
+            byte functionCode,
+            ushort address,
+            ushort value,
+            CancellationToken cancellationToken)
+        {
+            ThrowIfDisposed();
+
+            await requestLock.WaitAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            try
+            {
+                await EnsureConnectedAsync(cancellationToken)
+                    .ConfigureAwait(false);
+
+                ushort requestTransactionId =
+                    unchecked(++transactionId);
+                byte[] request = BuildWriteRequest(
+                    requestTransactionId,
+                    unitId,
+                    functionCode,
+                    address,
+                    value);
+
+                await WriteWithTimeoutAsync(
+                        request,
+                        cancellationToken)
+                    .ConfigureAwait(false);
+
+                await ReadWriteResponseAsync(
+                        requestTransactionId,
+                        unitId,
+                        functionCode,
+                        address,
+                        value,
                         cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -345,6 +429,95 @@ namespace BoxHost
             return payload;
         }
 
+        private async Task ReadWriteResponseAsync(
+            ushort expectedTransactionId,
+            byte expectedUnitId,
+            byte expectedFunctionCode,
+            ushort expectedAddress,
+            ushort expectedValue,
+            CancellationToken cancellationToken)
+        {
+            byte[] header = new byte[7];
+            await ReadExactlyWithTimeoutAsync(
+                    header,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            ushort transaction =
+                ReadUInt16(header, 0);
+            ushort protocol =
+                ReadUInt16(header, 2);
+            ushort length =
+                ReadUInt16(header, 4);
+            byte unitId = header[6];
+
+            if (transaction != expectedTransactionId)
+            {
+                throw new InvalidDataException(
+                    "Unexpected transaction identifier.");
+            }
+
+            if (protocol != 0)
+            {
+                throw new InvalidDataException(
+                    "Unexpected Modbus protocol identifier.");
+            }
+
+            if (unitId != expectedUnitId)
+            {
+                throw new InvalidDataException(
+                    "Unexpected Modbus unit identifier.");
+            }
+
+            if (length < 2 || length > 254)
+            {
+                throw new InvalidDataException(
+                    "Invalid Modbus response length.");
+            }
+
+            byte[] body = new byte[length - 1];
+            await ReadExactlyWithTimeoutAsync(
+                    body,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            byte functionCode = body[0];
+            if (functionCode ==
+                (byte)(expectedFunctionCode | 0x80))
+            {
+                if (body.Length < 2)
+                {
+                    throw new InvalidDataException(
+                        "Incomplete Modbus exception response.");
+                }
+
+                throw new ModbusProtocolException(
+                    expectedFunctionCode,
+                    body[1]);
+            }
+
+            if (functionCode != expectedFunctionCode)
+            {
+                throw new InvalidDataException(
+                    "Unexpected Modbus function code.");
+            }
+
+            if (body.Length != 5)
+            {
+                throw new InvalidDataException(
+                    "Invalid Modbus write response length.");
+            }
+
+            ushort address = ReadUInt16(body, 1);
+            ushort value = ReadUInt16(body, 3);
+            if (address != expectedAddress ||
+                value != expectedValue)
+            {
+                throw new InvalidDataException(
+                    "The device did not echo the requested write.");
+            }
+        }
+
         private async Task WriteWithTimeoutAsync(
             byte[] buffer,
             CancellationToken cancellationToken)
@@ -455,6 +628,27 @@ namespace BoxHost
             request[7] = functionCode;
             WriteUInt16(request, 8, startAddress);
             WriteUInt16(request, 10, itemCount);
+            return request;
+        }
+
+        private static byte[] BuildWriteRequest(
+            ushort requestTransactionId,
+            byte unitId,
+            byte functionCode,
+            ushort address,
+            ushort value)
+        {
+            byte[] request = new byte[12];
+            WriteUInt16(
+                request,
+                0,
+                requestTransactionId);
+            WriteUInt16(request, 2, 0);
+            WriteUInt16(request, 4, 6);
+            request[6] = unitId;
+            request[7] = functionCode;
+            WriteUInt16(request, 8, address);
+            WriteUInt16(request, 10, value);
             return request;
         }
 

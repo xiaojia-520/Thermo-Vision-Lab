@@ -1,6 +1,9 @@
 using BoxHost;
 using System;
+using System.Globalization;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -14,7 +17,10 @@ namespace ThermoVision
         private const int ChamberPort = 8000;
 
         private readonly TomiloChamberService service;
+        private ChamberSnapshot latestSnapshot;
         private bool monitoringStarted;
+        private bool commandRunning;
+        private bool setpointInputsInitialized;
         private bool shutdown;
 
         public ChamberControl()
@@ -26,6 +32,7 @@ namespace ThermoVision
                 ChamberPort);
             service.SnapshotReceived +=
                 Service_SnapshotReceived;
+            UpdateControlAvailability();
         }
 
         public event EventHandler BackRequested;
@@ -41,7 +48,7 @@ namespace ThermoVision
             monitoringStarted = true;
             ConnectionText.Text = "正在连接";
             MonitoringStatusText.Text =
-                "正在建立只读连接…";
+                "正在建立实验舱连接…";
             await service.StartAsync();
         }
 
@@ -53,6 +60,8 @@ namespace ThermoVision
             {
                 return;
             }
+
+            latestSnapshot = snapshot;
 
             Dispatcher.BeginInvoke(
                 new Action(
@@ -90,6 +99,7 @@ namespace ThermoVision
                             190,
                             54,
                             54));
+                UpdateControlAvailability();
                 return;
             }
 
@@ -125,6 +135,19 @@ namespace ThermoVision
                 FormatNullable(
                     snapshot.HumiditySetpoint,
                     " %RH");
+
+            if (!setpointInputsInitialized &&
+                snapshot.TemperatureSetpoint.HasValue &&
+                snapshot.HumiditySetpoint.HasValue)
+            {
+                TemperatureSetpointTextBox.Text =
+                    snapshot.TemperatureSetpoint.Value
+                        .ToString("F1");
+                HumiditySetpointTextBox.Text =
+                    snapshot.HumiditySetpoint.Value
+                        .ToString("F1");
+                setpointInputsInitialized = true;
+            }
 
             RunStateText.Text =
                 snapshot.IsRunning
@@ -193,6 +216,300 @@ namespace ThermoVision
             }
 
             ApplyAlarmState(snapshot);
+            UpdateControlAvailability();
+        }
+
+        private async void SetTemperatureButton_Click(
+            object sender,
+            RoutedEventArgs eventArgs)
+        {
+            double temperature;
+            if (!TryReadSetpoint(
+                    TemperatureSetpointTextBox.Text,
+                    TomiloChamberService
+                        .MinimumTemperatureSetpoint,
+                    TomiloChamberService
+                        .MaximumTemperatureSetpoint,
+                    "温度",
+                    out temperature))
+            {
+                return;
+            }
+
+            if (!ConfirmOperation(
+                    "确认将实验舱目标温度设置为 " +
+                    temperature.ToString("F1") +
+                    " ℃？",
+                    "确认温度设定"))
+            {
+                return;
+            }
+
+            await ExecuteCommandAsync(
+                "正在写入温度并回读确认……",
+                async delegate
+                {
+                    double applied =
+                        await service
+                            .SetTemperatureSetpointAsync(
+                                temperature,
+                                CancellationToken.None);
+                    TemperatureSetpointTextBox.Text =
+                        applied.ToString("F1");
+                    return "温度设定成功并已回读确认：" +
+                           applied.ToString("F1") +
+                           " ℃";
+                });
+        }
+
+        private async void SetHumidityButton_Click(
+            object sender,
+            RoutedEventArgs eventArgs)
+        {
+            double humidity;
+            if (!TryReadSetpoint(
+                    HumiditySetpointTextBox.Text,
+                    TomiloChamberService
+                        .MinimumHumiditySetpoint,
+                    TomiloChamberService
+                        .MaximumHumiditySetpoint,
+                    "湿度",
+                    out humidity))
+            {
+                return;
+            }
+
+            if (!ConfirmOperation(
+                    "确认将实验舱目标湿度设置为 " +
+                    humidity.ToString("F1") +
+                    " %RH？",
+                    "确认湿度设定"))
+            {
+                return;
+            }
+
+            await ExecuteCommandAsync(
+                "正在写入湿度并回读确认……",
+                async delegate
+                {
+                    double applied =
+                        await service
+                            .SetHumiditySetpointAsync(
+                                humidity,
+                                CancellationToken.None);
+                    HumiditySetpointTextBox.Text =
+                        applied.ToString("F1");
+                    return "湿度设定成功并已回读确认：" +
+                           applied.ToString("F1") +
+                           " %RH";
+                });
+        }
+
+        private async void StartChamberButton_Click(
+            object sender,
+            RoutedEventArgs eventArgs)
+        {
+            string setpointSummary =
+                latestSnapshot == null
+                    ? string.Empty
+                    : Environment.NewLine +
+                      "当前设定：" +
+                      FormatNullable(
+                          latestSnapshot
+                              .TemperatureSetpoint,
+                          " ℃") +
+                      "，" +
+                      FormatNullable(
+                          latestSnapshot
+                              .HumiditySetpoint,
+                          " %RH");
+
+            if (!ConfirmOperation(
+                    "确认启动实验舱？" +
+                    setpointSummary,
+                    "确认启动"))
+            {
+                return;
+            }
+
+            await ExecuteCommandAsync(
+                "正在发送启动命令并确认运行状态……",
+                async delegate
+                {
+                    await service.SetRunningAsync(
+                        true,
+                        CancellationToken.None);
+                    return "启动成功，实验舱已确认进入运行状态。";
+                });
+        }
+
+        private async void StopChamberButton_Click(
+            object sender,
+            RoutedEventArgs eventArgs)
+        {
+            if (!ConfirmOperation(
+                    "确认停止实验舱？",
+                    "确认停止"))
+            {
+                return;
+            }
+
+            await ExecuteCommandAsync(
+                "正在发送停止命令并确认停止状态……",
+                async delegate
+                {
+                    await service.SetRunningAsync(
+                        false,
+                        CancellationToken.None);
+                    return "停止成功，实验舱已确认停止。";
+                });
+        }
+
+        private async Task ExecuteCommandAsync(
+            string progressMessage,
+            Func<Task<string>> command)
+        {
+            if (shutdown || commandRunning)
+            {
+                return;
+            }
+
+            commandRunning = true;
+            CommandStatusText.Text = progressMessage;
+            CommandStatusText.Foreground =
+                new SolidColorBrush(
+                    Color.FromRgb(
+                        182,
+                        106,
+                        0));
+            UpdateControlAvailability();
+
+            try
+            {
+                string successMessage = await command();
+                CommandStatusText.Text = successMessage;
+                CommandStatusText.Foreground =
+                    new SolidColorBrush(
+                        Color.FromRgb(
+                            38,
+                            131,
+                            74));
+            }
+            catch (Exception exception)
+            {
+                CommandStatusText.Text =
+                    "操作失败：" +
+                    exception.Message;
+                CommandStatusText.Foreground =
+                    new SolidColorBrush(
+                        Color.FromRgb(
+                            190,
+                            54,
+                            54));
+
+                MessageBox.Show(
+                    exception.Message,
+                    "实验舱操作失败",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Error);
+            }
+            finally
+            {
+                commandRunning = false;
+                UpdateControlAvailability();
+            }
+        }
+
+        private void UpdateControlAvailability()
+        {
+            bool connected =
+                !shutdown &&
+                latestSnapshot != null &&
+                latestSnapshot.IsConnected;
+            bool ready =
+                connected &&
+                !commandRunning;
+
+            TemperatureSetpointTextBox.IsEnabled = ready;
+            HumiditySetpointTextBox.IsEnabled = ready;
+            SetTemperatureButton.IsEnabled = ready;
+            SetHumidityButton.IsEnabled = ready;
+
+            bool hasAlarm =
+                connected &&
+                (latestSnapshot.TotalAlarm == true ||
+                 latestSnapshot.ActiveAlarms != null &&
+                 latestSnapshot.ActiveAlarms.Any());
+
+            StartChamberButton.IsEnabled =
+                ready &&
+                !latestSnapshot.IsRunning &&
+                !hasAlarm;
+            StopChamberButton.IsEnabled =
+                ready &&
+                latestSnapshot.IsRunning;
+        }
+
+        private static bool TryReadSetpoint(
+            string text,
+            double minimum,
+            double maximum,
+            string valueName,
+            out double value)
+        {
+            bool parsed = double.TryParse(
+                    text,
+                    NumberStyles.Float,
+                    CultureInfo.CurrentCulture,
+                    out value) ||
+                double.TryParse(
+                    text,
+                    NumberStyles.Float,
+                    CultureInfo.InvariantCulture,
+                    out value);
+
+            double scaled = value * 10.0;
+            bool hasOneDecimalPlace =
+                parsed &&
+                Math.Abs(
+                    scaled -
+                    Math.Round(
+                        scaled,
+                        MidpointRounding.AwayFromZero)) <
+                0.000001;
+
+            if (parsed &&
+                !double.IsNaN(value) &&
+                !double.IsInfinity(value) &&
+                value >= minimum &&
+                value <= maximum &&
+                hasOneDecimalPlace)
+            {
+                return true;
+            }
+
+            MessageBox.Show(
+                valueName + "设定值必须在 " +
+                minimum.ToString("F1") + " 到 " +
+                maximum.ToString("F1") +
+                " 之间，并且最多保留一位小数。",
+                "设定值无效",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
+            value = 0;
+            return false;
+        }
+
+        private static bool ConfirmOperation(
+            string message,
+            string title)
+        {
+            return MessageBox.Show(
+                       message,
+                       title,
+                       MessageBoxButton.YesNo,
+                       MessageBoxImage.Question) ==
+                   MessageBoxResult.Yes;
         }
 
         private void ApplyAlarmState(

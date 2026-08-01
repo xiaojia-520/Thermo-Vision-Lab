@@ -191,19 +191,19 @@
                             </Grid>
                             <StackPanel Grid.Row="1"
                                         Margin="0,24,0,24">
-                                <TextBlock Text="实验舱监控"
+                                <TextBlock Text="实验舱监控与控制"
                                            Foreground="#17233A"
                                            FontSize="23"
                                            FontWeight="SemiBold"/>
                                 <TextBlock Margin="0,12,0,0"
-                                           Text="只读监视温湿度、设定值、运行阶段、部件状态与报警。"
+                                           Text="监视温湿度与报警，设置目标值并远程启停实验舱。"
                                            Foreground="#66758B"
                                            FontSize="13"
                                            TextWrapping="Wrap"
                                            LineHeight="21"/>
                             </StackPanel>
                             <Button Grid.Row="2"
-                                    Content="进入实验舱监控"
+                                    Content="进入实验舱控制"
                                     Style="{StaticResource ModuleButtonStyle}"
                                     Click="CabinetButton_Click"/>
                         </Grid>
@@ -289,13 +289,16 @@
                                                FontSize="14"
                                                FontWeight="Bold"/>
                                 </Border>
-                                <Border HorizontalAlignment="Right"
+                                <Border x:Name="InfraredConnectionBadge"
+                                        HorizontalAlignment="Right"
                                         VerticalAlignment="Top"
                                         Padding="9,4"
-                                        Background="#EAF7EF"
-                                        CornerRadius="10">
-                                    <TextBlock Text="已接入"
-                                               Foreground="#26834A"
+                                        Background="#F0F3F7"
+                                        CornerRadius="10"
+                                        ToolTip="通过 Ping 192.168.1.201 判断相机是否在线">
+                                    <TextBlock x:Name="InfraredConnectionText"
+                                               Text="检测中"
+                                               Foreground="#718096"
                                                FontSize="11"/>
                                 </Border>
                             </Grid>
@@ -337,7 +340,7 @@
                                    FontWeight="SemiBold"/>
                         <TextBlock Grid.Column="1"
                                    Margin="24,0,0,0"
-                                   Text="实验舱：192.168.1.30:8000　　运动控制器：192.168.1.31 / .32 / .33:8088"
+                                   Text="实验舱：192.168.1.30:8000　　运动控制器：192.168.1.31 / .32 / .33:8088　　红外相机：192.168.1.201"
                                    Foreground="#4F6485"
                                    FontSize="13"/>
                     </Grid>
