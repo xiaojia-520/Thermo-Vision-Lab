@@ -12,6 +12,9 @@ namespace ThermoVision
 {
     public partial class AxisControl : UserControl
     {
+        private const float PhysicalLimitSafetyMargin =
+            30.0f;
+
         private readonly MotionHostClient motionHostClient;
         private readonly bool[] controllerConnected =
             new bool[4];
@@ -255,11 +258,11 @@ namespace ThermoVision
                 return;
             }
 
-            if (minimum < 0 ||
+            if (minimum < PhysicalLimitSafetyMargin ||
                 minimum >= maximum)
             {
                 ShowInputError(
-                    "软件限位必须满足：0 ≤ 最小值 < 最大值。");
+                    "软件限位必须满足：30 ≤ 最小值 < 最大值；最大值也必须保留负限位安全余量。");
                 return;
             }
 
@@ -786,7 +789,7 @@ namespace ThermoVision
                 }
                 else
                 {
-                    LimitMinimumTextBox.Text = "0.000";
+                    LimitMinimumTextBox.Text = "30.000";
                     LimitMaximumTextBox.Text = "150.000";
                 }
             }
@@ -1087,6 +1090,12 @@ namespace ThermoVision
             MoveToTargetButton.IsEnabled =
                 readyToMove;
 
+            bool canEditLimits =
+                !busy &&
+                connected &&
+                axisStatus != null &&
+                axisStatus.HasSoftwareLimits;
+
             OperationAxisComboBox.IsEnabled =
                 !busy;
             StepDistanceTextBox.IsEnabled =
@@ -1094,11 +1103,11 @@ namespace ThermoVision
             TargetPositionTextBox.IsEnabled =
                 !busy;
             LimitMinimumTextBox.IsEnabled =
-                !busy;
+                canEditLimits;
             LimitMaximumTextBox.IsEnabled =
-                !busy;
+                canEditLimits;
             SaveLimitsButton.IsEnabled =
-                !busy &&
+                canEditLimits &&
                 monitoringTask != null &&
                 monitoringTask.Status ==
                     TaskStatus.RanToCompletion;
@@ -1146,7 +1155,7 @@ namespace ThermoVision
             else if (!axisStatus.HasSoftwareLimits)
             {
                 OperationReadinessText.Text =
-                    "请先保存当前轴的软件限位范围";
+                    "请先执行负限位/行程标定，生成带安全余量的软件限位范围";
                 OperationReadinessText.Foreground =
                     CreateBrush("#A96800");
             }

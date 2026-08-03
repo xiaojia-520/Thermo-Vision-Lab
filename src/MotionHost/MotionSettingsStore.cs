@@ -8,6 +8,9 @@ namespace MotionHost
 {
     internal sealed class MotionSettingsStore
     {
+        internal const float PhysicalLimitSafetyMargin =
+            30.0f;
+
         private readonly object syncRoot =
             new object();
         private readonly Dictionary<string, AxisSettings>
@@ -76,8 +79,24 @@ namespace MotionHost
                             controllerNumber,
                             axis),
                         out axisSettings) &&
-                    axisSettings.HasLimits)
+                    axisSettings.HasLimits &&
+                    axisSettings.HasCalibratedTravel)
                 {
+                    float safeMaximum =
+                        axisSettings.CalibratedMaximumTravel -
+                        PhysicalLimitSafetyMargin;
+
+                    if (axisSettings.Minimum <
+                            PhysicalLimitSafetyMargin ||
+                        axisSettings.Maximum > safeMaximum ||
+                        axisSettings.Minimum >=
+                            axisSettings.Maximum)
+                    {
+                        minimum = 0;
+                        maximum = 0;
+                        return false;
+                    }
+
                     minimum =
                         axisSettings.Minimum;
                     maximum =
@@ -107,27 +126,9 @@ namespace MotionHost
                         controllerNumber,
                         axis);
 
-                bool previousHasZero =
-                    axisSettings.HasZero;
-                float previousRawZeroPosition =
-                    axisSettings.RawZeroPosition;
-
                 axisSettings.HasZero = true;
                 axisSettings.RawZeroPosition =
                     rawZeroPosition;
-
-                try
-                {
-                    SaveLocked();
-                }
-                catch
-                {
-                    axisSettings.HasZero =
-                        previousHasZero;
-                    axisSettings.RawZeroPosition =
-                        previousRawZeroPosition;
-                    throw;
-                }
             }
         }
 
@@ -142,26 +143,8 @@ namespace MotionHost
                         controllerNumber,
                         axis);
 
-                bool previousHasZero =
-                    axisSettings.HasZero;
-                float previousRawZeroPosition =
-                    axisSettings.RawZeroPosition;
-
                 axisSettings.HasZero = false;
                 axisSettings.RawZeroPosition = 0;
-
-                try
-                {
-                    SaveLocked();
-                }
-                catch
-                {
-                    axisSettings.HasZero =
-                        previousHasZero;
-                    axisSettings.RawZeroPosition =
-                        previousRawZeroPosition;
-                    throw;
-                }
             }
         }
 
@@ -184,18 +167,33 @@ namespace MotionHost
                     "软件限位最小值必须小于最大值。");
             }
 
-            if (minimum < 0)
-            {
-                throw new ArgumentException(
-                    "软件限位最小值不能小于 0；当前软件坐标从正限位向负方向递增。");
-            }
-
             lock (syncRoot)
             {
                 AxisSettings axisSettings =
                     GetOrCreate(
                         controllerNumber,
                         axis);
+
+                if (!axisSettings.HasCalibratedTravel)
+                {
+                    throw new InvalidOperationException(
+                        "当前轴没有有效的机械行程标定，请先执行负限位/行程标定。");
+                }
+
+                float safeMaximum =
+                    axisSettings.CalibratedMaximumTravel -
+                    PhysicalLimitSafetyMargin;
+
+                if (minimum < PhysicalLimitSafetyMargin ||
+                    maximum > safeMaximum)
+                {
+                    throw new ArgumentException(
+                        "软件限位必须位于机械限位安全范围 [" +
+                        PhysicalLimitSafetyMargin.ToString("F3") +
+                        ", " +
+                        safeMaximum.ToString("F3") +
+                        "] 内。");
+                }
 
                 bool previousHasLimits =
                     axisSettings.HasLimits;
@@ -214,6 +212,72 @@ namespace MotionHost
                 }
                 catch
                 {
+                    axisSettings.HasLimits =
+                        previousHasLimits;
+                    axisSettings.Minimum =
+                        previousMinimum;
+                    axisSettings.Maximum =
+                        previousMaximum;
+                    throw;
+                }
+            }
+        }
+
+        internal void SetCalibratedTravelAndDefaultLimits(
+            int controllerNumber,
+            int axis,
+            float maximumTravel)
+        {
+            ValidateFinite(
+                maximumTravel,
+                "maximumTravel");
+
+            if (maximumTravel <=
+                PhysicalLimitSafetyMargin * 2)
+            {
+                throw new ArgumentException(
+                    "机械行程必须大于两端安全余量之和。",
+                    "maximumTravel");
+            }
+
+            lock (syncRoot)
+            {
+                AxisSettings axisSettings =
+                    GetOrCreate(
+                        controllerNumber,
+                        axis);
+
+                bool previousHasCalibratedTravel =
+                    axisSettings.HasCalibratedTravel;
+                float previousCalibratedMaximumTravel =
+                    axisSettings.CalibratedMaximumTravel;
+                bool previousHasLimits =
+                    axisSettings.HasLimits;
+                float previousMinimum =
+                    axisSettings.Minimum;
+                float previousMaximum =
+                    axisSettings.Maximum;
+
+                axisSettings.HasCalibratedTravel = true;
+                axisSettings.CalibratedMaximumTravel =
+                    maximumTravel;
+                axisSettings.HasLimits = true;
+                axisSettings.Minimum =
+                    PhysicalLimitSafetyMargin;
+                axisSettings.Maximum =
+                    maximumTravel -
+                    PhysicalLimitSafetyMargin;
+
+                try
+                {
+                    SaveLocked();
+                }
+                catch
+                {
+                    axisSettings.HasCalibratedTravel =
+                        previousHasCalibratedTravel;
+                    axisSettings.CalibratedMaximumTravel =
+                        previousCalibratedMaximumTravel;
                     axisSettings.HasLimits =
                         previousHasLimits;
                     axisSettings.Minimum =
@@ -300,16 +364,19 @@ namespace MotionHost
                             controllerNumber,
                             axis);
 
-                    float value;
+                    float calibratedMaximumTravel;
 
                     if (TryReadFloat(
-                        element,
-                        "rawZero",
-                        out value))
+                            element,
+                            "calibratedMaximumTravel",
+                            out calibratedMaximumTravel) &&
+                        calibratedMaximumTravel >
+                            PhysicalLimitSafetyMargin * 2)
                     {
-                        axisSettings.HasZero = true;
-                        axisSettings.RawZeroPosition =
-                            value;
+                        axisSettings.HasCalibratedTravel =
+                            true;
+                        axisSettings.CalibratedMaximumTravel =
+                            calibratedMaximumTravel;
                     }
 
                     float minimum;
@@ -323,7 +390,13 @@ namespace MotionHost
                             element,
                             "maximum",
                             out maximum) &&
-                        minimum >= 0 &&
+                        axisSettings.HasCalibratedTravel &&
+                        minimum >=
+                            PhysicalLimitSafetyMargin &&
+                        maximum <=
+                            axisSettings
+                                .CalibratedMaximumTravel -
+                            PhysicalLimitSafetyMargin &&
                         minimum < maximum)
                     {
                         axisSettings.HasLimits = true;
@@ -358,7 +431,7 @@ namespace MotionHost
             foreach (AxisSettings axisSettings
                 in settings.Values)
             {
-                if (!axisSettings.HasZero &&
+                if (!axisSettings.HasCalibratedTravel &&
                     !axisSettings.HasLimits)
                 {
                     continue;
@@ -375,13 +448,13 @@ namespace MotionHost
                             "axis",
                             axisSettings.Axis));
 
-                if (axisSettings.HasZero)
+                if (axisSettings.HasCalibratedTravel)
                 {
                     element.Add(
                         new XAttribute(
-                            "rawZero",
+                            "calibratedMaximumTravel",
                             axisSettings
-                                .RawZeroPosition
+                                .CalibratedMaximumTravel
                                 .ToString(
                                     "R",
                                     CultureInfo
@@ -558,6 +631,18 @@ namespace MotionHost
             }
 
             internal float Maximum
+            {
+                get;
+                set;
+            }
+
+            internal bool HasCalibratedTravel
+            {
+                get;
+                set;
+            }
+
+            internal float CalibratedMaximumTravel
             {
                 get;
                 set;

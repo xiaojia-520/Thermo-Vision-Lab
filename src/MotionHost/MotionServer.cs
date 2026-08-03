@@ -994,7 +994,8 @@ namespace MotionHost
         private const float SlowdownSegmentDistance = 2.0f;
         private const float ZeroAcceleration = 1.0f;
         private const float ZeroDeceleration = 1.0f;
-        private const float ReleaseDistance = 30.0f;
+        private const float ReleaseDistance =
+            MotionSettingsStore.PhysicalLimitSafetyMargin;
         private const float MaximumSeekDistance = 150.0f;
         private const float MaximumRangeCalibrationDistance =
             3000.0f;
@@ -1038,11 +1039,6 @@ namespace MotionHost
             this.ipAddress = ipAddress;
             this.axes = axes;
             this.settingsStore = settingsStore;
-
-            foreach (int axis in axes)
-            {
-                zeroReferenceValid[axis] = true;
-            }
         }
 
         internal int ControllerNumber
@@ -1759,8 +1755,7 @@ namespace MotionHost
                     float existingRawZeroPosition;
 
                     zeroKnownBeforeHome[configuredAxis] =
-                        settingsStore.TryGetZero(
-                            ControllerNumber,
+                        TryGetUsableZero(
                             configuredAxis,
                             out existingRawZeroPosition);
                     knownRawZeroPositions[configuredAxis] =
@@ -1999,11 +1994,16 @@ namespace MotionHost
                         rawZeroPositions[axis] -
                         maximumTravel;
 
-                    settingsStore.SetLimits(
-                        ControllerNumber,
-                        axis,
-                        0,
-                        maximumTravel);
+                    settingsStore
+                        .SetCalibratedTravelAndDefaultLimits(
+                            ControllerNumber,
+                            axis,
+                            maximumTravel);
+
+                    float safeMaximum =
+                        maximumTravel -
+                        MotionSettingsStore
+                            .PhysicalLimitSafetyMargin;
 
                     progress(
                         ControllerNumber,
@@ -2012,7 +2012,14 @@ namespace MotionHost
                         rawNegativeLimitPosition
                             .ToString("F3") +
                         "，最大行程 " +
-                        maximumTravel.ToString("F3"));
+                        maximumTravel.ToString("F3") +
+                        "，安全软件范围 [" +
+                        MotionSettingsStore
+                            .PhysicalLimitSafetyMargin
+                            .ToString("F3") +
+                        ", " +
+                        safeMaximum.ToString("F3") +
+                        "]");
 
                     if (summary.Length > 0)
                     {
@@ -2030,6 +2037,18 @@ namespace MotionHost
                         "，最大行程：");
                     summary.Append(
                         maximumTravel.ToString("F3"));
+                    summary.Append(
+                        "，安全软件范围：[");
+                    summary.Append(
+                        MotionSettingsStore
+                            .PhysicalLimitSafetyMargin
+                            .ToString("F3"));
+                    summary.Append(
+                        ", ");
+                    summary.Append(
+                        safeMaximum.ToString("F3"));
+                    summary.Append(
+                        "]");
                 }
 
                 result(
@@ -2144,12 +2163,19 @@ namespace MotionHost
                         triggeredRawPosition;
 
                     if (!IsFinite(maximumTravel) ||
-                        maximumTravel <= ReleaseDistance)
+                        maximumTravel <=
+                            MotionSettingsStore
+                                .PhysicalLimitSafetyMargin *
+                            2)
                     {
                         throw new InvalidOperationException(
                             GetAxisName(axis) +
                             " 轴测得的最大行程无效：" +
-                            maximumTravel.ToString("F3"));
+                            maximumTravel.ToString("F3") +
+                            "；必须大于两端安全余量之和 " +
+                            (MotionSettingsStore
+                                .PhysicalLimitSafetyMargin *
+                                2).ToString("F3"));
                     }
 
                     ReleaseNegativeLimit(

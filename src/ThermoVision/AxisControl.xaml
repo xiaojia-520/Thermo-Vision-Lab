@@ -491,12 +491,12 @@
                                     </Grid.ColumnDefinitions>
                                     <TextBox x:Name="LimitMinimumTextBox"
                                                 Height="30"
-                                                ToolTip="最小软件坐标，不能小于0"
+                                                ToolTip="最小软件坐标，不能小于30（正限位安全余量）"
                                                 VerticalContentAlignment="Center"/>
                                     <TextBox x:Name="LimitMaximumTextBox"
                                                 Grid.Column="2"
                                                 Height="30"
-                                                ToolTip="最大软件坐标"
+                                                ToolTip="最大软件坐标，不能超过标定行程减30（负限位安全余量）"
                                                 VerticalContentAlignment="Center"/>
                                     <Button x:Name="SaveLimitsButton"
                                             Grid.Column="4"
