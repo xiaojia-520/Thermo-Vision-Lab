@@ -123,7 +123,8 @@ namespace ThermoVision
             MoveRelativeAsync(
                 int controllerNumber,
                 int axis,
-                float distance)
+                float distance,
+                float speed)
         {
             ValidateControllerNumber(
                 controllerNumber);
@@ -137,6 +138,9 @@ namespace ThermoVision
                     CultureInfo.InvariantCulture),
                 distance.ToString(
                     "R",
+                    CultureInfo.InvariantCulture),
+                speed.ToString(
+                    "R",
                     CultureInfo.InvariantCulture));
         }
 
@@ -144,7 +148,8 @@ namespace ThermoVision
             MoveAbsoluteAsync(
                 int controllerNumber,
                 int axis,
-                float targetPosition)
+                float targetPosition,
+                float speed)
         {
             ValidateControllerNumber(
                 controllerNumber);
@@ -157,6 +162,9 @@ namespace ThermoVision
                 axis.ToString(
                     CultureInfo.InvariantCulture),
                 targetPosition.ToString(
+                    "R",
+                    CultureInfo.InvariantCulture),
+                speed.ToString(
                     "R",
                     CultureInfo.InvariantCulture));
         }

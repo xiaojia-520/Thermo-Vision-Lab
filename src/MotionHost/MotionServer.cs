@@ -467,12 +467,13 @@ namespace MotionHost
 
             if ((command == "MOVE_REL" ||
                 command == "MOVE_ABS") &&
-                parts.Length == 5)
+                parts.Length == 6)
             {
                 int requestId;
                 int controllerNumber;
                 int axis;
                 float value;
+                float speed;
 
                 if (!int.TryParse(
                         parts[1],
@@ -487,7 +488,12 @@ namespace MotionHost
                         parts[4],
                         NumberStyles.Float,
                         CultureInfo.InvariantCulture,
-                        out value))
+                        out value) ||
+                    !float.TryParse(
+                        parts[5],
+                        NumberStyles.Float,
+                        CultureInfo.InvariantCulture,
+                        out speed))
                 {
                     return;
                 }
@@ -513,6 +519,7 @@ namespace MotionHost
                         requestId,
                         axis,
                         value,
+                        speed,
                         command == "MOVE_ABS",
                         SendProgress,
                         SendResult,
@@ -986,7 +993,7 @@ namespace MotionHost
         private const int DeceleratedStop = 1;
         private const int RelativeMove = 1;
         private const int PollIntervalMilliseconds = 50;
-        private const float MoveSpeed = 4.0f;
+        private const float MaximumMoveSpeed = 50.0f;
         private const float KnownZeroSpeed = 10.0f;
         private const float UnknownZeroSpeed = 1.0f;
         private const float SlowMoveSpeed = 1.0f;
@@ -1303,6 +1310,7 @@ namespace MotionHost
             int requestId,
             int axis,
             float value,
+            float speed,
             bool absolute,
             Action<int, string> progress,
             Action<int, bool, int, string> result,
@@ -1312,6 +1320,18 @@ namespace MotionHost
             {
                 error =
                     "当前控制器不支持该轴。";
+                return false;
+            }
+
+            if (float.IsNaN(speed) ||
+                float.IsInfinity(speed) ||
+                speed <= 0 ||
+                speed > MaximumMoveSpeed)
+            {
+                error =
+                    "移动速度必须大于 0 且不能超过 " +
+                    MaximumMoveSpeed.ToString("F0") +
+                    "。";
                 return false;
             }
 
@@ -1380,6 +1400,7 @@ namespace MotionHost
                         requestId,
                         axis,
                         value,
+                        speed,
                         absolute,
                         progress,
                         result);
@@ -2304,6 +2325,7 @@ namespace MotionHost
             int requestId,
             int axis,
             float value,
+            float speed,
             bool absolute,
             Action<int, string> progress,
             Action<int, bool, int, string> result)
@@ -2427,7 +2449,9 @@ namespace MotionHost
                     GetAxisName(axis) +
                     " 轴正在移动到 " +
                     targetSoftwarePosition
-                        .ToString("F3"));
+                        .ToString("F3") +
+                    "，速度 " +
+                    speed.ToString("F3"));
 
                 DateTime deadline =
                     DateTime.UtcNow.AddSeconds(
@@ -2439,6 +2463,7 @@ namespace MotionHost
                     current.RawPosition,
                     rawDirection,
                     targetSoftwarePosition,
+                    speed,
                     minimum,
                     maximum,
                     deadline);
@@ -2529,6 +2554,7 @@ namespace MotionHost
             float currentRawPosition,
             float rawDirection,
             float targetSoftwarePosition,
+            float moveSpeed,
             float minimum,
             float maximum,
             DateTime deadline)
@@ -2556,7 +2582,7 @@ namespace MotionHost
                 MoveSegmentAndWait(
                     axis,
                     rawDirection,
-                    MoveSpeed,
+                    moveSpeed,
                     rawZeroPosition,
                     minimum,
                     maximum,
@@ -2582,7 +2608,7 @@ namespace MotionHost
                 MoveSegmentAndWait(
                     axis,
                     fastDistance,
-                    MoveSpeed,
+                    moveSpeed,
                     rawZeroPosition,
                     minimum,
                     maximum,
@@ -2600,6 +2626,11 @@ namespace MotionHost
             {
                 return;
             }
+
+            float minimumApproachSpeed =
+                Math.Min(
+                    SlowMoveSpeed,
+                    moveSpeed);
 
             while (true)
             {
@@ -2635,9 +2666,10 @@ namespace MotionHost
                 float segmentSpeed =
                     remainingDistance <=
                         SlowdownSegmentDistance
-                        ? SlowMoveSpeed
-                        : SlowMoveSpeed +
-                            (MoveSpeed - SlowMoveSpeed) *
+                        ? minimumApproachSpeed
+                        : minimumApproachSpeed +
+                            (moveSpeed -
+                                minimumApproachSpeed) *
                             speedRatio;
                 float segmentDistance =
                     Math.Min(

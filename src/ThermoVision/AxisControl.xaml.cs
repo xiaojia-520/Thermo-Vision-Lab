@@ -14,6 +14,7 @@ namespace ThermoVision
     {
         private const float PhysicalLimitSafetyMargin =
             30.0f;
+        private const float MaximumMoveSpeed = 50.0f;
 
         private readonly MotionHostClient motionHostClient;
         private readonly bool[] controllerConnected =
@@ -173,6 +174,7 @@ namespace ThermoVision
         {
             Button button = sender as Button;
             float distance;
+            float speed;
 
             if (button == null ||
                 !TryReadFiniteFloat(
@@ -185,6 +187,11 @@ namespace ThermoVision
                 return;
             }
 
+            if (!TryReadMoveSpeed(out speed))
+            {
+                return;
+            }
+
             int direction =
                 button.Tag.ToString() == "-1"
                     ? -1
@@ -193,6 +200,7 @@ namespace ThermoVision
             await ExecuteMoveAsync(
                 GetSelectedOperationAxis(),
                 distance * direction,
+                speed,
                 false);
         }
 
@@ -201,6 +209,7 @@ namespace ThermoVision
             RoutedEventArgs eventArgs)
         {
             float targetPosition;
+            float speed;
 
             if (!TryReadFiniteFloat(
                 TargetPositionTextBox.Text,
@@ -208,6 +217,11 @@ namespace ThermoVision
             {
                 ShowInputError(
                     "目标位置必须是有限数值。");
+                return;
+            }
+
+            if (!TryReadMoveSpeed(out speed))
+            {
                 return;
             }
 
@@ -221,6 +235,8 @@ namespace ThermoVision
                     GetAxisName(axis) +
                     " 轴将移动到软件坐标 " +
                     targetPosition.ToString("F3") +
+                    "，速度 " +
+                    speed.ToString("F3") +
                     "。" +
                     Environment.NewLine +
                     "确认现场运动路径安全后继续。",
@@ -236,6 +252,7 @@ namespace ThermoVision
             await ExecuteMoveAsync(
                 axis,
                 targetPosition,
+                speed,
                 true);
         }
 
@@ -313,6 +330,7 @@ namespace ThermoVision
         private async Task ExecuteMoveAsync(
             int axis,
             float value,
+            float speed,
             bool absolute)
         {
             int controllerNumber =
@@ -338,12 +356,14 @@ namespace ThermoVision
                             .MoveAbsoluteAsync(
                                 controllerNumber,
                                 axis,
-                                value)
+                                value,
+                                speed)
                         : await motionHostClient
                             .MoveRelativeAsync(
                                 controllerNumber,
                                 axis,
-                                value);
+                                value,
+                                speed);
 
                 MotionStatusText.Text =
                     result.Output;
@@ -1100,6 +1120,8 @@ namespace ThermoVision
                 !busy;
             StepDistanceTextBox.IsEnabled =
                 !busy;
+            MoveSpeedTextBox.IsEnabled =
+                !busy;
             TargetPositionTextBox.IsEnabled =
                 !busy;
             LimitMinimumTextBox.IsEnabled =
@@ -1344,6 +1366,23 @@ namespace ThermoVision
             return selectedIndex < 0
                 ? 0
                 : selectedIndex;
+        }
+
+        private bool TryReadMoveSpeed(
+            out float speed)
+        {
+            if (!TryReadFiniteFloat(
+                    MoveSpeedTextBox.Text,
+                    out speed) ||
+                speed <= 0 ||
+                speed > MaximumMoveSpeed)
+            {
+                ShowInputError(
+                    "移动速度必须是大于 0 且不超过 50 的有限数值。");
+                return false;
+            }
+
+            return true;
         }
 
         private static bool TryReadFiniteFloat(
